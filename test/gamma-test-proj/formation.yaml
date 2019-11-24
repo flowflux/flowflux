@@ -1,0 +1,11 @@
+definition:
+  extract-first-name:
+    type: command
+    cmd: node ../node-procs/test-extract-prop.js
+    env:
+      PROP_NAME: first_name
+
+flow:
+  - - <stdin>
+    - extract-first-name
+    - <stdout>

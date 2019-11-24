@@ -1,0 +1,1 @@
+STATIC_PATH=./ go run main.go ./example/static_file_server/formation.yaml
