@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/test"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/test"
 )
 
 // TestWriterLogWithSingleReader ...

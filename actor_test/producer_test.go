@@ -5,10 +5,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jaqmol/approx/actor"
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/event"
-	"github.com/jaqmol/approx/test"
+	"github.com/flowflux/flowflux/actor"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/event"
+	"github.com/flowflux/flowflux/test"
 )
 
 func TestSingleProducer(t *testing.T) {

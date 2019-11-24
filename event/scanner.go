@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/jaqmol/approx/config"
+	"github.com/flowflux/flowflux/config"
 )
 
 var msgEndLength int

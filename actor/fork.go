@@ -3,7 +3,7 @@ package actor
 import (
 	"log"
 
-	"github.com/jaqmol/approx/config"
+	"github.com/flowflux/flowflux/config"
 )
 
 // Fork ...

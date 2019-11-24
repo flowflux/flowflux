@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jaqmol/approx/logging"
+	"github.com/flowflux/flowflux/logging"
 
-	"github.com/jaqmol/approx/actor"
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/project"
+	"github.com/flowflux/flowflux/actor"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/project"
 )
 
 const actorInboxSize = 10

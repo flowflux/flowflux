@@ -1,6 +1,6 @@
 package test
 
-import "github.com/jaqmol/approx/config"
+import "github.com/flowflux/flowflux/config"
 
 // SimpleSequenceConfig ...
 type SimpleSequenceConfig struct {

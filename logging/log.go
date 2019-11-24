@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/jaqmol/approx/event"
+	"github.com/flowflux/flowflux/event"
 )
 
 // Log ...

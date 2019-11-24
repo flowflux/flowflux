@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/jaqmol/approx/project"
+	"github.com/flowflux/flowflux/project"
 )
 
 // Formation ...

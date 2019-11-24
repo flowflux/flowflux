@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jaqmol/approx/project"
+	"github.com/flowflux/flowflux/project"
 )
 
 // TestProjectDefinition ...

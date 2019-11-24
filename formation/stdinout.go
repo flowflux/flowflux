@@ -5,8 +5,8 @@ import (
 	"io"
 	"log"
 
-	"github.com/jaqmol/approx/actor"
-	"github.com/jaqmol/approx/event"
+	"github.com/flowflux/flowflux/actor"
+	"github.com/flowflux/flowflux/event"
 )
 
 func newStdinActor(reader io.Reader) *actor.Producer {

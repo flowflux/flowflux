@@ -1,7 +1,7 @@
 package processor
 
 import (
-	"github.com/jaqmol/approx/config"
+	"github.com/flowflux/flowflux/config"
 )
 
 var evntEndLength int

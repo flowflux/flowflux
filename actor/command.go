@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/event"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/event"
 )
 
 // Command ...

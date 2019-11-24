@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jaqmol/approx/event"
+	"github.com/flowflux/flowflux/event"
 )
 
 // CheckCmdLogMsg ...

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/jaqmol/approx/actor"
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/test"
+	"github.com/flowflux/flowflux/actor"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/test"
 )
 
 func TestSimpleFork(t *testing.T) {

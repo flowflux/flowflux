@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jaqmol/approx/actor"
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/logging"
-	"github.com/jaqmol/approx/test"
+	"github.com/flowflux/flowflux/actor"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/logging"
+	"github.com/flowflux/flowflux/test"
 )
 
 // TestCommandWithBufferProcessing ...

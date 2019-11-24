@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/project"
-	"github.com/jaqmol/approx/test"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/project"
+	"github.com/flowflux/flowflux/test"
 )
 
 // TestFlowTree ...

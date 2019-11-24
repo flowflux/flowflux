@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jaqmol/approx/project"
+	"github.com/flowflux/flowflux/project"
 )
 
 // FlowTree ...

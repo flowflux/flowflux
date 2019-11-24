@@ -1,14 +1,22 @@
 {
   "name": "flowflux",
-  "version": "1.0.0",
-  "description": "NodeJS integration for APPROX",
+  "version": "1.0.1",
+  "description": "NodeJS integration for Flowflux",
   "main": "index.js",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/flowflux/flowflux.git"
+  },
   "scripts": {
     "test": "jest"
   },
   "keywords": [
-    "APPROX",
-    "NODE"
+    "flow",
+    "flux",
+    "node",
+    "process",
+    "stream",
+    "processing"
   ],
   "author": "Ronny Reichmann",
   "license": "MIT",

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jaqmol/approx/config"
-	"github.com/jaqmol/approx/project"
+	"github.com/flowflux/flowflux/config"
+	"github.com/flowflux/flowflux/project"
 )
 
 // TeTestConfigurationFormation ...

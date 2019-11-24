@@ -3,7 +3,7 @@ package processor
 import (
 	"bytes"
 
-	"github.com/jaqmol/approx/config"
+	"github.com/flowflux/flowflux/config"
 )
 
 // ClearEventEnd ...
