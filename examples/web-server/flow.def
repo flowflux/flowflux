@@ -1,0 +1,3 @@
+node web-server.js -> node read-file.js -> node merge-response.js
+node web-server.js -> node find-media-type.js -> node merge-response.js
+node merge-response.js -> node web-server.js

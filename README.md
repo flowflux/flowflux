@@ -1,6 +1,21 @@
 # FLOWFLUX
 
-Connect small, reactive processes to form applications.
+Connect small, reactive processes in every programming language that can read and write to Stdin and Stdout in a flow graph to form applications.
+
+- Communicating processes are also known as actor-based concurrency
+- Processes are interconnecting via a messaging-bus
+- The form of programming is also known as event-driven or reactive
+- The concurrency paradigm like actor based programming languages (Erlang) / messaging queues (RabbitMQ)
+
+## Why?
+
+- Easy to handle form of parallel/concurrent programming
+- Easy to handle form of inter-process-communication between programs in different programming languages
+- Faster than the same thing via sockets or network interface, also no port-management required
+- Unix pipes are cool and everything that makes them usable for more problems is highly welcome 
+- Communication between processes can be visualized
+
+### Also 
 
 1. Small is beautiful.
 2. Make each program do one thing well.
@@ -14,47 +29,83 @@ Connect small, reactive processes to form applications.
 
 *Mike Gancarz: The UNIX Philosoph*
 
-## Nomenclature
+## Input, Output
 
-### Flowflux executable
+Messages/events flow through a process/actor via `stdin` and `stdout`. Stream-connectors are expressed as named pipes. The builtin actors "fork" and "merge" are used to splice and reunite the event streams. The builtin actors "pipe" is used to rewire any `stdout` to any `stdin` via a name pipe.
 
-Reads a formation and spins up a flow-graph of actors.
+## Simple Wire Format
 
-### Actor
+Messages/events are JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope is used: the message is bas64-encoded with the delimiter `\n---\n`. Th reasons for this are pervasiveness of base64, ease of use and the resulting robustness.
 
-A process classified by:
+## Usage
 
-- Parametrized by environment variables
-- Listens for events from an input-streams
-- Processes events and data
-- Writes events to an output-streams
-- As low complexity as possible
-- Listen for events until it receives SIGINT
+First the `flow` command line tool is used to set up the infrastructure of named pipes. Usually automated by a shell-script. Second the actual actors/processes are started with their Stdin and Stdout connected to the named pipes.
 
-### Input, Output
+### `flow` CLI usage
 
-Events flow through an actor via `stdin` and `stdout`. The builtin actors "fork" and "merge" are used to splice the event stream.
+```bash
+$ ./flow
+flow
+Utility to build messaging systems by composing command line processes
+pipe <name>
+  Pipe message stream from <name>.wr to <name>.rd
+fork <wr-name> <rd-name-1> <rd-name-2> <...>
+  Fork message stream from wr-fifo into all provided rd-fifos
+merge <wr-name-1> <wr-name-2> <...< <rd-name>
+  Merge message stream from all provided wr-fifos into rd-fifo
+input <name>
+  Input JSON messages to stream them to <name>
+cleanup <directory>
+  Cleanup directory from fifos (wr & rd)
+```
 
-## Why
+### Example:
 
-- To allow for designing applications as a flow-graph of stream actors.
-- To design each of them as a low complexity stream process, that transforms input into output.
-- To build multi-process-applications easily and with every programming language that can read/write to stdin/-out.
-- To mix and match programming languages as comes handy.
-- To choose the best library (or programming language) for a single problem.
-- Not to be forced into compromises.
+Given the following flow-graph...
 
-A flow-graph of stream actors is an event driven architecture. Listening for messages / or IPC via reading from `stdin` is among the most basic of tasks in the very most of programming languages. Also:
-- Very good performance.
-- Very good documentation.
-- Maximum operating system support.
+```ascii
+        Client / Network
 
-### Why not unix sockets?
+            |     ^
+            V     |
 
-Too difficult to reach in most programming languages. Too complex to use.
-Sockets don't perform better than pipes.
+         web-server.js  <---------------o
+                                        |
+               |                        |
+               |                        |
+     o---------o---------o              |
+     |                   |              |
+     V                   V              |
+                                        |
+read-file.js     find-media-type.js     |
+                                        |
+     |                   |              |
+     o---------o---------o              |
+               |                        |
+               |                        |
+               V                        |
+                                        |
+        merge-response.js  -------------o
+```
 
-### Why not http, websockets, long polling, ...?
+The communications can be described in a flow.def files as follows:
 
-Request-response-based network communication protocols are not a natural or effective choice for event driven architectures. Especially not if used on the same machine.
-Communicating processes via network interface is not as ressource efficient as pipes.
+```ascii
+node web-server.js -> node read-file.js -> node merge-response.js
+node web-server.js -> node find-media-type.js -> node merge-response.js
+node merge-response.js -> node web-server.js
+```
+
+And run as follows:
+
+```bash
+$ ./flow flow.flow
+```
+
+Alternatively `flow` CLI can be used to manage a collection of named UNIX pipes. See [example/README.md](example/README.md) for details.
+
+### Example folder
+
+The example folder contains an actor-based static web-server implementation in NodeJS. Where each process follows a fire-and-forget-strategy. Messages/events are running in one direction only. Both things eliminate all problems and difficulties of concurrency and parallel-programming at once. 
+
+The file [example/flow-messaging.js](example/flow-messaging.js) contains the only API necessary, to get the implementation DRY, in 36 LOCs. Porting it to other programming languages should be simple.

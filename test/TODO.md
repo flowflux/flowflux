@@ -1,2 +1,0 @@
-- write a static server as final test
-- finish main.go
