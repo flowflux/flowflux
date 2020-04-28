@@ -12,11 +12,6 @@ type RawBytesScanner struct {
 	message []byte
 	number  int
 	err     error
-	// MOST LIKELY NOT NEEDED:
-	// decodedBuffer   []byte
-	// Decode          func([]byte) ([]byte, error)
-	// delimitedBuffer []byte
-	// delimiter       []byte
 }
 
 // NewRawBytesScanner ...
@@ -52,31 +47,6 @@ func (r *RawBytesScanner) Message() []byte {
 	}
 	return r.message
 }
-
-// MOST LIKELY NOT NEEDED:
-//
-// // DecodedMessage ...
-// func (r *RawBytesScanner) DecodedMessage() ([]byte, error) {
-// 	if r.decodedBuffer == nil {
-// 		if r.Decode == nil {
-// 			return nil, fmt.Errorf("No decoder provided")
-// 		}
-// 		decodedBuffer, err := r.Decode(r.buffer[:r.number])
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		r.decodedBuffer = decodedBuffer
-// 	}
-// 	return r.decodedBuffer, nil
-// }
-//
-// // DelimitedMessage ...
-// func (r *RawBytesScanner) DelimitedMessage() []byte {
-// 	if r.delimitedBuffer == nil {
-// 		r.delimitedBuffer = append(r.buffer[:r.number], r.delimiter...)
-// 	}
-// 	return r.delimitedBuffer
-// }
 
 // Err ...
 func (r *RawBytesScanner) Err() error {

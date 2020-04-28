@@ -22,7 +22,6 @@ process.stdin.on('data', data => {
         return null;
       })
       .filter(l => !!l);
-    console.error('sending config message:', JSON.stringify(config));
     send({cmd: 'COMPOSE', config});
   } else {
     throw new Error(`Markdown table in config file "${configFilename}" could not be parsed, only strict markdown tables are supported`);

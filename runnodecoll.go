@@ -24,13 +24,11 @@ func validateNodeCollection(collection NodeCollection) error {
 	}
 	for _, nodeID := range collection.IDs() {
 		node, nodeExists := collection.Node(nodeID)
-		// log.Printf("Checking node id: %s, does exist: %v\n", nodeID, nodeExists)
 		if !nodeExists {
 			return makeError(node)
 		}
 		for _, nextNodeID := range node.OutKeys {
 			nextNode, nextNodeExists := collection.Node(nextNodeID)
-			// log.Printf("  -> connected node id: %s, does exist: %v\n", nextNodeID, nextNodeExists)
 			if !nextNodeExists {
 				return makeError(nextNode)
 			}
@@ -119,12 +117,6 @@ func runNodeCollection(collection NodeCollection) {
 		}
 	}
 
-	// concludeTimer := time.NewTimer(concludeTimeoutDuration)
-	// concludeTimer.Stop()
-	// conclude := func() {
-	// 	os.Exit(0)
-	// }
-
 	for {
 		breakLoop := false
 		select {
@@ -136,10 +128,6 @@ func runNodeCollection(collection NodeCollection) {
 			break
 		}
 	}
-
-	// for message := range processErrorMsgs {
-	// 	printErrLn(string(message))
-	// }
 }
 
 // Runner ...
@@ -256,19 +244,8 @@ func (p ProcessRunner) Start() {
 		log.Fatal(err)
 	}
 
-	printLogLn(fmt.Sprintf(
-		"Did start: %s %s",
-		p.node.Process.Command,
-		strings.Join(p.node.Process.Arguments, ", "),
-	))
-
 	for message := range p.channel {
 		if message.EOF {
-			printLogLn(fmt.Sprintf(
-				"COMMAND PROCESS %s %s DISPATCHING EOF",
-				p.node.Process.Command,
-				strings.Join(p.node.Process.Arguments, ", "),
-			))
 			cmdIn.Close()
 		} else {
 			_, err := cmdIn.Write(message.payload)
@@ -312,30 +289,6 @@ func (i InputRunner) Start() {
 		bytesScanner := NewRawBytesScanner(os.Stdin)
 		scannedMessage = bytesScanner.Message
 		scanner = bytesScanner
-
-		// reader := bufio.NewReader(os.Stdin)
-		// bufferSize := 1000
-		// buffer := make([]byte, bufferSize)
-		// dispatchChannels := collectInputChannels(i.findOutputRunners(i))
-		//
-		// for {
-		// 	n, err := reader.Read(buffer)
-		// 	if err != nil && err != io.EOF {
-		// 		log.Fatalf("Error reading from STDIN: %s", err)
-		// 	}
-		//
-		// 	message := make([]byte, n)
-		// 	copy(message, buffer)
-		//
-		// 	for _, c := range dispatchChannels {
-		// 		c <- message
-		// 	}
-		//
-		// 	if err == io.EOF {
-		// 		i.inputEOF <- true
-		// 		break
-		// 	}
-		// }
 	}
 
 	for scanner.Scan() {
@@ -348,7 +301,6 @@ func (i InputRunner) Start() {
 	if scanner.Err() != nil {
 		if scanner.Err() == io.EOF {
 			for _, c := range dispatchChannels {
-				printLogLn("INPUT DISPATCHING EOF")
 				c <- InputMessage{
 					EOF: true,
 				}
@@ -378,9 +330,7 @@ func (o OutputRunner) Start() {
 	writer := bufio.NewWriter(os.Stdout)
 
 	for message := range o.channel {
-		// printLogLn(fmt.Sprintf("OutputRunner did receive message of length: %v\n", len(message)))
 		if message.EOF {
-			printLogLn("OUTPUT DISPATCHING EOF")
 			os.Stdout.Close()
 			o.didCloseOutput <- true
 		} else {

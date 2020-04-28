@@ -122,11 +122,6 @@ func parseHubFile(filePath string) map[string]Node {
 	}
 
 	connections := parseConnections(fileContent)
-	printErrLn("Did parse connections:")
-	for _, conn := range connections {
-		printErrLn(fmt.Sprintf("  %s %v %s", conn.fromCmd, conn.fromScanMethod, conn.toCmd))
-	}
-
 	mainIndex := make(map[string]Node)
 	connectionIndex := make(map[string]Node)
 
@@ -294,24 +289,6 @@ func mapToCmdIDs(cmds ...string) []string {
 	return cmdIDs
 }
 
-// func parseLines(fileContent []byte) [][]string {
-// 	lines := make([][]string, 0)
-// 	tokenLines := bytes.Split(fileContent, []byte{'\n'})
-// 	for _, line := range tokenLines {
-// 		tokenizeLine(line)
-// 		tokensPerLine := bytes.Split(line, []byte{'-', '>'})
-// 		commandsPerLine := make([]string, 0)
-// 		for _, token := range tokensPerLine {
-// 			command := string(bytes.TrimSpace(token))
-// 			commandsPerLine = append(commandsPerLine, command)
-// 		}
-// 		if len(commandsPerLine) > 0 {
-// 			lines = append(lines, commandsPerLine)
-// 		}
-// 	}
-// 	return lines
-// }
-
 func parseConnections(fileContent []byte) []connection {
 	connections := make([]connection, 0)
 	contained := make(map[string]bool)
@@ -367,43 +344,6 @@ func tokenizeLine(line []byte) [][]byte {
 	tokens = append(tokens, lastCmd)
 	return tokens
 }
-
-// func makeConnectedPairs(lines [][]string) [][]string {
-// 	pairs := make([][]string, 0)
-// 	contained := make(map[string]bool)
-// 	addPair := func(fromCmd string, toCmd string) {
-// 		key := fmt.Sprintf("%s:%s", fromCmd, toCmd)
-// 		_, ok := contained[key]
-// 		if !ok {
-// 			pairs = append(pairs, []string{fromCmd, toCmd})
-// 			contained[key] = true
-// 		}
-// 	}
-// 	for _, line := range lines {
-// 		for i, command := range line {
-// 			if i > 0 {
-// 				if i < (len(line) - 1) {
-// 					// both previous and next tokens
-// 					previousCommand := line[i-1]
-// 					nextCommand := line[i+1]
-// 					addPair(previousCommand, command)
-// 					addPair(command, nextCommand)
-// 				} else {
-// 					// only previous token
-// 					previousCommand := line[i-1]
-// 					addPair(previousCommand, command)
-// 				}
-// 			} else {
-// 				if len(line) > 1 {
-// 					// only next token
-// 					nextCommand := line[i+1]
-// 					addPair(command, nextCommand)
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return pairs
-// }
 
 type uniqueProcess struct {
 	name       string
