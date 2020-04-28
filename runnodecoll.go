@@ -51,7 +51,7 @@ func runNodeCollection(collection NodeCollection) {
 	}
 
 	processErrorMsgs := make(chan []byte)
-	inputEOF := make(chan bool)
+	didCloseOutput := make(chan bool)
 
 	for _, id := range collection.IDs() {
 		n, _ := collection.Node(id)
@@ -60,14 +60,14 @@ func runNodeCollection(collection NodeCollection) {
 			i := InputRunner{
 				node:              n,
 				findOutputRunners: findOutputRunners,
-				inputEOF:          inputEOF,
 			}
 			index[n.ID] = i
 		case OutputClass:
 			o := OutputRunner{
 				node:              n,
 				findOutputRunners: findOutputRunners,
-				channel:           make(chan []byte, channelBufferSize),
+				channel:           make(chan InputMessage, channelBufferSize),
+				didCloseOutput:    didCloseOutput,
 			}
 			index[n.ID] = o
 		case ForkClass:
@@ -78,14 +78,14 @@ func runNodeCollection(collection NodeCollection) {
 			i := InfrastructureRunner{
 				node:              n,
 				findOutputRunners: findOutputRunners,
-				channel:           make(chan []byte, channelBufferSize),
+				channel:           make(chan InputMessage, channelBufferSize),
 			}
 			index[n.ID] = i
 		case ProcessClass:
 			c := ProcessRunner{
 				node:              n,
 				findOutputRunners: findOutputRunners,
-				channel:           make(chan []byte, channelBufferSize),
+				channel:           make(chan InputMessage, channelBufferSize),
 				processErrorMsgs:  processErrorMsgs,
 			}
 			index[n.ID] = c
@@ -119,21 +119,21 @@ func runNodeCollection(collection NodeCollection) {
 		}
 	}
 
-	concludeTimer := time.NewTimer(concludeTimeoutDuration)
-	concludeTimer.Stop()
-	conclude := func() {
-		os.Exit(0)
-	}
+	// concludeTimer := time.NewTimer(concludeTimeoutDuration)
+	// concludeTimer.Stop()
+	// conclude := func() {
+	// 	os.Exit(0)
+	// }
 
 	for {
+		breakLoop := false
 		select {
 		case msg := <-processErrorMsgs:
 			printErrLn(string(msg))
-		case <-inputEOF:
-			concludeTimer.Stop()
-			concludeTimer.Reset(concludeTimeoutDuration)
-		case <-concludeTimer.C:
-			conclude()
+		case breakLoop = <-didCloseOutput:
+		}
+		if breakLoop {
+			break
 		}
 	}
 
@@ -145,15 +145,21 @@ func runNodeCollection(collection NodeCollection) {
 // Runner ...
 type Runner interface {
 	Node() Node
-	Input() chan<- []byte
+	Input() chan<- InputMessage
 	Start()
+}
+
+// InputMessage ...
+type InputMessage struct {
+	payload []byte
+	EOF     bool
 }
 
 // InfrastructureRunner ...
 type InfrastructureRunner struct {
 	node              Node
 	findOutputRunners func(Runner) []Runner
-	channel           chan []byte
+	channel           chan InputMessage
 }
 
 // Node ...
@@ -171,13 +177,13 @@ func (i InfrastructureRunner) Start() {
 }
 
 // Input ...
-func (i InfrastructureRunner) Input() chan<- []byte { return i.channel }
+func (i InfrastructureRunner) Input() chan<- InputMessage { return i.channel }
 
 // ProcessRunner ...
 type ProcessRunner struct {
 	node              Node
 	findOutputRunners func(Runner) []Runner
-	channel           chan []byte
+	channel           chan InputMessage
 	processErrorMsgs  chan<- []byte
 }
 
@@ -210,18 +216,37 @@ func (p ProcessRunner) Start() {
 
 	go func() {
 		dispatchChannels := collectInputChannels(p.findOutputRunners(p))
-		printLogLn(fmt.Sprintf(
-			"%s %s will dispatch to %v channels",
-			p.node.Process.Command,
-			p.node.Process.Arguments,
-			len(dispatchChannels),
-		))
-		scanner := NewHeavyDutyScanner(cmdOut, MsgDelimiter)
-		// scanner.Decode = DecodeBase64Message NOT NEEDED DecodeMessage never called
+		var scanner FlowScanner
+		var scannedMessage func() []byte
+
+		if p.node.ScanMethod == ScanMessages {
+			dutyScanner := NewHeavyDutyScanner(cmdOut, MsgDelimiter)
+			scannedMessage = dutyScanner.DelimitedMessage
+			scanner = dutyScanner
+
+		} else if p.node.ScanMethod == ScanRawBytes {
+			bytesScanner := NewRawBytesScanner(cmdOut)
+			scannedMessage = bytesScanner.Message
+			scanner = bytesScanner
+		}
+
 		for scanner.Scan() {
 			for _, c := range dispatchChannels {
-				c <- scanner.DelimitedMessage()
-				printLogLn(fmt.Sprintf("DID DISPATCH LEN %v MSG", len(scanner.Message())))
+				c <- InputMessage{
+					payload: scannedMessage(),
+				}
+			}
+		}
+
+		if scanner.Err() != nil {
+			if scanner.Err() == io.EOF {
+				for _, c := range dispatchChannels {
+					c <- InputMessage{
+						EOF: true,
+					}
+				}
+			} else {
+				log.Fatal(scanner.Err())
 			}
 		}
 	}()
@@ -230,6 +255,7 @@ func (p ProcessRunner) Start() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	printLogLn(fmt.Sprintf(
 		"Did start: %s %s",
 		p.node.Process.Command,
@@ -237,19 +263,35 @@ func (p ProcessRunner) Start() {
 	))
 
 	for message := range p.channel {
-		cmdIn.Write(message)
+		if message.EOF {
+			printLogLn(fmt.Sprintf(
+				"COMMAND PROCESS %s %s DISPATCHING EOF",
+				p.node.Process.Command,
+				strings.Join(p.node.Process.Arguments, ", "),
+			))
+			cmdIn.Close()
+		} else {
+			_, err := cmdIn.Write(message.payload)
+			if err != nil {
+				log.Fatalf(
+					"Error writing to stdin of %s %s: %s",
+					p.node.Process.Command,
+					strings.Join(p.node.Process.Arguments, ", "),
+					err,
+				)
+			}
+		}
 	}
 }
 
 // Input ...
-func (p ProcessRunner) Input() chan<- []byte { return p.channel }
+func (p ProcessRunner) Input() chan<- InputMessage { return p.channel }
 
 // InputRunner ...
 type InputRunner struct {
 	node              Node
 	findOutputRunners func(Runner) []Runner
-	channel           chan []byte
-	inputEOF          chan<- bool
+	channel           chan InputMessage
 }
 
 // Node ...
@@ -257,37 +299,75 @@ func (i InputRunner) Node() Node { return i.node }
 
 // Start ...
 func (i InputRunner) Start() {
-	reader := bufio.NewReader(os.Stdin)
 	dispatchChannels := collectInputChannels(i.findOutputRunners(i))
+	var scanner FlowScanner
+	var scannedMessage func() []byte
 
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err != nil && err != io.EOF {
-			log.Fatalf("Error reading from STDIN: %s", err)
-		}
+	if i.node.ScanMethod == ScanMessages {
+		dutyScanner := NewHeavyDutyScanner(os.Stdin, MsgDelimiter)
+		scannedMessage = dutyScanner.DelimitedMessage
+		scanner = dutyScanner
 
-		message := make([]byte, len(line))
-		copy(message, line)
+	} else if i.node.ScanMethod == ScanRawBytes {
+		bytesScanner := NewRawBytesScanner(os.Stdin)
+		scannedMessage = bytesScanner.Message
+		scanner = bytesScanner
 
+		// reader := bufio.NewReader(os.Stdin)
+		// bufferSize := 1000
+		// buffer := make([]byte, bufferSize)
+		// dispatchChannels := collectInputChannels(i.findOutputRunners(i))
+		//
+		// for {
+		// 	n, err := reader.Read(buffer)
+		// 	if err != nil && err != io.EOF {
+		// 		log.Fatalf("Error reading from STDIN: %s", err)
+		// 	}
+		//
+		// 	message := make([]byte, n)
+		// 	copy(message, buffer)
+		//
+		// 	for _, c := range dispatchChannels {
+		// 		c <- message
+		// 	}
+		//
+		// 	if err == io.EOF {
+		// 		i.inputEOF <- true
+		// 		break
+		// 	}
+		// }
+	}
+
+	for scanner.Scan() {
 		for _, c := range dispatchChannels {
-			c <- message
+			c <- InputMessage{
+				payload: scannedMessage(),
+			}
 		}
-
-		if err == io.EOF {
-			i.inputEOF <- true
-			break
+	}
+	if scanner.Err() != nil {
+		if scanner.Err() == io.EOF {
+			for _, c := range dispatchChannels {
+				printLogLn("INPUT DISPATCHING EOF")
+				c <- InputMessage{
+					EOF: true,
+				}
+			}
+		} else {
+			log.Fatal(scanner.Err())
 		}
 	}
 }
 
 // Input ...
-func (i InputRunner) Input() chan<- []byte { return i.channel }
+func (i InputRunner) Input() chan<- InputMessage { return i.channel }
 
 // OutputRunner ...
 type OutputRunner struct {
 	node              Node
 	findOutputRunners func(Runner) []Runner
-	channel           chan []byte
+	channel           chan InputMessage
+	didCloseOutput    chan<- bool
 }
 
 // Node ...
@@ -298,20 +378,26 @@ func (o OutputRunner) Start() {
 	writer := bufio.NewWriter(os.Stdout)
 
 	for message := range o.channel {
-		n, err := writer.Write(message)
-		if err != nil {
-			log.Fatalf("Error writing to STDOUT: %s", err)
+		// printLogLn(fmt.Sprintf("OutputRunner did receive message of length: %v\n", len(message)))
+		if message.EOF {
+			printLogLn("OUTPUT DISPATCHING EOF")
+			os.Stdout.Close()
+			o.didCloseOutput <- true
+		} else {
+			_, err := writer.Write(message.payload)
+			if err != nil {
+				log.Fatalf("Error writing final flow output to stdout: %s", err)
+			}
 		}
-		printLogLn(fmt.Sprintf("DID WRITE %v/%v TO STDOUT", n, len(message)))
 	}
 }
 
 // Input ...
-func (o OutputRunner) Input() chan<- []byte { return o.channel }
+func (o OutputRunner) Input() chan<- InputMessage { return o.channel }
 
 // collectInputChannels
-func collectInputChannels(runners []Runner) []chan<- []byte {
-	channels := make([]chan<- []byte, len(runners))
+func collectInputChannels(runners []Runner) []chan<- InputMessage {
+	channels := make([]chan<- InputMessage, len(runners))
 	for i, r := range runners {
 		channels[i] = r.Input()
 	}

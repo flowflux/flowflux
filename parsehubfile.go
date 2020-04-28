@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -44,10 +45,11 @@ func NodeClassToString(class NodeClass) string {
 
 // Node ...
 type Node struct {
-	Class   NodeClass
-	ID      string
-	Process ProcessCommand
-	OutKeys []string
+	Class      NodeClass
+	ID         string
+	ScanMethod ScanMethod
+	Process    ProcessCommand
+	OutKeys    []string
 }
 
 // ProcessCommand ...
@@ -60,6 +62,21 @@ type ProcessCommand struct {
 type NodeCollection struct {
 	index     map[string]Node
 	indexKeys []string
+}
+
+// ScanMethod ...
+type ScanMethod int
+
+// ScanMethods ...
+const (
+	ScanMessages ScanMethod = iota
+	ScanRawBytes
+)
+
+type connection struct {
+	fromCmd        string
+	fromScanMethod ScanMethod
+	toCmd          string
 }
 
 // NewNodeCollection ...
@@ -104,11 +121,10 @@ func parseHubFile(filePath string) map[string]Node {
 		log.Fatal("Error reading hub file: ", filePath, ": ", err)
 	}
 
-	lines := parseLines(fileContent)
-	connectedPairs := makeConnectedPairs(lines)
-	log.Println("Did parse connected pairs:")
-	for _, pair := range connectedPairs {
-		log.Printf("PAIR %s : %s\n", pair[0], pair[1])
+	connections := parseConnections(fileContent)
+	printErrLn("Did parse connections:")
+	for _, conn := range connections {
+		printErrLn(fmt.Sprintf("  %s %v %s", conn.fromCmd, conn.fromScanMethod, conn.toCmd))
 	}
 
 	mainIndex := make(map[string]Node)
@@ -116,88 +132,90 @@ func parseHubFile(filePath string) map[string]Node {
 
 	// 1st analyze connection
 
-	for source, destinations := range findForkConnections(connectedPairs) {
+	for _, forkConn := range findForkConnections(connections) {
 		n := Node{
 			Class:   ForkClass,
-			ID:      makeForkID(source, destinations),
-			OutKeys: mapToCmdIDs(destinations...),
+			ID:      makeForkID(forkConn.fromCmd, forkConn.toCmds),
+			OutKeys: mapToCmdIDs(forkConn.toCmds...),
 		}
 		mainIndex[n.ID] = n
-		connectionIndex[forkFromKey(source)] = n
-		for _, destination := range destinations {
-			connectionIndex[forkToKey(destination)] = n
+		connectionIndex[forkFromKey(forkConn.fromCmd)] = n
+		for _, toCmd := range forkConn.toCmds {
+			connectionIndex[forkToKey(toCmd)] = n
 		}
 	}
 
-	for destination, sources := range findMergeConnections(connectedPairs) {
+	for _, mergeConn := range findMergeConnections(connections) {
 		n := Node{
 			Class:   MergeClass,
-			ID:      makeMergeID(sources, destination),
-			OutKeys: mapToCmdIDs(destination),
+			ID:      makeMergeID(mergeConn.fromCmds, mergeConn.toCmd),
+			OutKeys: mapToCmdIDs(mergeConn.toCmd),
 		}
 		mainIndex[n.ID] = n
-		connectionIndex[mergeToKey(destination)] = n
-		for _, source := range sources {
-			connectionIndex[mergeFromKey(source)] = n
+		connectionIndex[mergeToKey(mergeConn.toCmd)] = n
+		for _, fromCmd := range mergeConn.fromCmds {
+			connectionIndex[mergeFromKey(fromCmd)] = n
 		}
 	}
 
-	for source, destination := range findPipeConnections(connectedPairs) {
+	for _, pipeConn := range findPipeConnections(connections) {
 		n := Node{
 			Class:   PipeClass,
-			ID:      makePipeID(source, destination),
-			OutKeys: mapToCmdIDs(destination),
+			ID:      makePipeID(pipeConn.fromCmd, pipeConn.toCmd),
+			OutKeys: mapToCmdIDs(pipeConn.toCmd),
 		}
 		mainIndex[n.ID] = n
-		connectionIndex[pipeFromKey(source)] = n
-		connectionIndex[pipeToKey(destination)] = n
+		connectionIndex[pipeFromKey(pipeConn.fromCmd)] = n
+		connectionIndex[pipeToKey(pipeConn.toCmd)] = n
 	}
 
-	for inputTo, outputFrom := range findInputOutputConnection(connectedPairs) {
-		if len(inputTo) > 0 {
+	for _, inOutConn := range findInputOutputConnection(connections) {
+		if len(inOutConn.inputTo) > 0 {
 			in := Node{
-				Class:   InputClass,
-				ID:      makeInputID(inputTo),
-				OutKeys: mapToCmdIDs(inputTo),
+				Class:      InputClass,
+				ID:         makeInputID(inOutConn.inputTo),
+				ScanMethod: inOutConn.inputScanMethod,
+				OutKeys:    mapToCmdIDs(inOutConn.inputTo),
 			}
 			mainIndex[in.ID] = in
-			connectionIndex[inputToKey(inputTo)] = in
+			connectionIndex[inputToKey(inOutConn.inputTo)] = in
 		}
-		if len(outputFrom) > 0 {
+		if len(inOutConn.outputFrom) > 0 {
 			out := Node{
 				Class: OutputClass,
-				ID:    makeOutputID(outputFrom),
+				ID:    makeOutputID(inOutConn.outputFrom),
 			}
 			mainIndex[out.ID] = out
-			connectionIndex[outputFromKey(outputFrom)] = out
+			connectionIndex[outputFromKey(inOutConn.outputFrom)] = out
 		}
 	}
 
 	// 2nd setup process nodes
 
-	for _, cmd := range uniqueProcessNames(lines) {
+	for _, uniProc := range findUniqueProcesses(connections) {
 		n := Node{
-			Class:   ProcessClass,
-			ID:      makeCmdID(cmd),
-			Process: parseProcessCommand(cmd),
+			Class:      ProcessClass,
+			ID:         makeCmdID(uniProc.name),
+			ScanMethod: uniProc.scanMethod,
+			Process:    parseProcessCommand(uniProc.name),
 		}
 
-		next, ok := connectionIndex[pipeFromKey(cmd)]
+		next, ok := connectionIndex[pipeFromKey(uniProc.name)]
 		if ok {
 			n.OutKeys = append(n.OutKeys, next.ID)
 		}
 
-		next, ok = connectionIndex[forkFromKey(cmd)]
+		next, ok = connectionIndex[forkFromKey(uniProc.name)]
 		if ok {
 			n.OutKeys = append(n.OutKeys, next.ID)
 		}
 
-		next, ok = connectionIndex[mergeFromKey(cmd)]
+		next, ok = connectionIndex[mergeFromKey(uniProc.name)]
 		if ok {
 			n.OutKeys = append(n.OutKeys, next.ID)
 		}
 
-		next, ok = connectionIndex[outputFromKey(cmd)]
+		next, ok = connectionIndex[outputFromKey(uniProc.name)]
 		if ok {
 			n.OutKeys = append(n.OutKeys, next.ID)
 		}
@@ -276,75 +294,142 @@ func mapToCmdIDs(cmds ...string) []string {
 	return cmdIDs
 }
 
-func parseLines(fileContent []byte) [][]string {
-	lines := make([][]string, 0)
-	tokenLines := bytes.Split(fileContent, []byte{'\n'})
-	for _, line := range tokenLines {
-		tokensPerLine := bytes.Split(line, []byte{'-', '>'})
-		commandsPerLine := make([]string, 0)
-		for _, token := range tokensPerLine {
-			command := string(bytes.TrimSpace(token))
-			commandsPerLine = append(commandsPerLine, command)
-		}
-		if len(commandsPerLine) > 0 {
-			lines = append(lines, commandsPerLine)
-		}
-	}
-	return lines
-}
+// func parseLines(fileContent []byte) [][]string {
+// 	lines := make([][]string, 0)
+// 	tokenLines := bytes.Split(fileContent, []byte{'\n'})
+// 	for _, line := range tokenLines {
+// 		tokenizeLine(line)
+// 		tokensPerLine := bytes.Split(line, []byte{'-', '>'})
+// 		commandsPerLine := make([]string, 0)
+// 		for _, token := range tokensPerLine {
+// 			command := string(bytes.TrimSpace(token))
+// 			commandsPerLine = append(commandsPerLine, command)
+// 		}
+// 		if len(commandsPerLine) > 0 {
+// 			lines = append(lines, commandsPerLine)
+// 		}
+// 	}
+// 	return lines
+// }
 
-func makeConnectedPairs(lines [][]string) [][]string {
-	pairs := make([][]string, 0)
+func parseConnections(fileContent []byte) []connection {
+	connections := make([]connection, 0)
 	contained := make(map[string]bool)
-	addPair := func(fromCmd string, toCmd string) {
-		key := fmt.Sprintf("%s:%s", fromCmd, toCmd)
+	addTriple := func(fromCmd string, scanMethodStr string, toCmd string) {
+		key := fmt.Sprintf("%s%s%s", fromCmd, scanMethodStr, toCmd)
 		_, ok := contained[key]
 		if !ok {
-			pairs = append(pairs, []string{fromCmd, toCmd})
+			var scanMethod ScanMethod
+			if scanMethodStr == "->" {
+				scanMethod = ScanMessages
+			} else if scanMethodStr == "*->" {
+				scanMethod = ScanRawBytes
+			}
+			conn := connection{
+				fromCmd:        fromCmd,
+				fromScanMethod: scanMethod,
+				toCmd:          toCmd,
+			}
+			connections = append(connections, conn)
 			contained[key] = true
 		}
 	}
-	for _, line := range lines {
-		for i, command := range line {
-			if i > 0 {
-				if i < (len(line) - 1) {
-					// both previous and next tokens
-					previousCommand := line[i-1]
-					nextCommand := line[i+1]
-					addPair(previousCommand, command)
-					addPair(command, nextCommand)
-				} else {
-					// only previous token
-					previousCommand := line[i-1]
-					addPair(previousCommand, command)
-				}
-			} else {
-				if len(line) > 1 {
-					// only next token
-					nextCommand := line[i+1]
-					addPair(command, nextCommand)
-				}
-			}
+	for _, line := range bytes.Split(fileContent, []byte{'\n'}) {
+		tokens := tokenizeLine(line)
+		iterMax := len(tokens) - 2
+		for i := 0; i < iterMax; i += 2 {
+			addTriple(
+				string(tokens[i]),
+				string(tokens[i+1]),
+				string(tokens[i+2]),
+			)
 		}
 	}
-	return pairs
+	return connections
 }
 
-func uniqueProcessNames(lines [][]string) []string {
-	processes := make([]string, 0)
+func tokenizeLine(line []byte) [][]byte {
+	tokens := make([][]byte, 0)
+	re := regexp.MustCompile(`\*\->|\->`)
+	indexes := re.FindAllIndex(line, -1)
+	if indexes == nil {
+		return tokens
+	}
+	lastEnd := 0
+	for _, idx := range indexes {
+		start, end := idx[0], idx[1]
+		fromCmd := bytes.TrimSpace(line[lastEnd:start])
+		finding := line[start:end]
+		lastEnd = end
+		tokens = append(tokens, fromCmd, finding)
+	}
+	lastCmd := bytes.TrimSpace(line[lastEnd:])
+	tokens = append(tokens, lastCmd)
+	return tokens
+}
+
+// func makeConnectedPairs(lines [][]string) [][]string {
+// 	pairs := make([][]string, 0)
+// 	contained := make(map[string]bool)
+// 	addPair := func(fromCmd string, toCmd string) {
+// 		key := fmt.Sprintf("%s:%s", fromCmd, toCmd)
+// 		_, ok := contained[key]
+// 		if !ok {
+// 			pairs = append(pairs, []string{fromCmd, toCmd})
+// 			contained[key] = true
+// 		}
+// 	}
+// 	for _, line := range lines {
+// 		for i, command := range line {
+// 			if i > 0 {
+// 				if i < (len(line) - 1) {
+// 					// both previous and next tokens
+// 					previousCommand := line[i-1]
+// 					nextCommand := line[i+1]
+// 					addPair(previousCommand, command)
+// 					addPair(command, nextCommand)
+// 				} else {
+// 					// only previous token
+// 					previousCommand := line[i-1]
+// 					addPair(previousCommand, command)
+// 				}
+// 			} else {
+// 				if len(line) > 1 {
+// 					// only next token
+// 					nextCommand := line[i+1]
+// 					addPair(command, nextCommand)
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return pairs
+// }
+
+type uniqueProcess struct {
+	name       string
+	scanMethod ScanMethod
+}
+
+func findUniqueProcesses(connections []connection) []uniqueProcess {
+	processes := make([]uniqueProcess, 0)
 	contained := make(map[string]bool)
-	addProcess := func(cmd string) {
+	addProcess := func(cmd string, hasScanMethod bool, scanMethod ScanMethod) {
 		_, ok := contained[cmd]
-		if !ok {
-			processes = append(processes, cmd)
+		if !ok || hasScanMethod {
+			proc := uniqueProcess{
+				name:       cmd,
+				scanMethod: scanMethod,
+			}
+			processes = append(processes, proc)
 			contained[cmd] = true
 		}
 	}
-	for _, line := range lines {
-		for _, command := range line {
-			if len(command) > 0 {
-				addProcess(command)
-			}
+	for _, conn := range connections {
+		if len(conn.fromCmd) > 0 {
+			addProcess(conn.fromCmd, true, conn.fromScanMethod)
+		}
+		if len(conn.toCmd) > 0 {
+			addProcess(conn.toCmd, false, 0)
 		}
 	}
 	return processes
@@ -385,83 +470,147 @@ func makeToKey(kind string, toCmd string) string {
 	return fmt.Sprintf("%s:->%s", kind, toCmd)
 }
 
-func connectionsFrom(cmd string, connectedPairs [][]string) []string {
-	acc := make([]string, 0)
-	for _, pair := range connectedPairs {
-		if pair[0] == cmd {
-			dest := pair[1]
-			if len(dest) > 0 {
-				acc = append(acc, dest)
+func connectionsFrom(cmd string, connections []connection) []string {
+	toCmds := make([]string, 0)
+	for _, conn := range connections {
+		if conn.fromCmd == cmd {
+			if len(conn.toCmd) > 0 { // TODO: PROBABLY UNNECESSARY
+				toCmds = append(toCmds, conn.toCmd)
 			}
 		}
 	}
-	return acc
+	return toCmds
 }
-func connectionsTo(cmd string, connectedPairs [][]string) []string {
-	acc := make([]string, 0)
-	for _, pair := range connectedPairs {
-		if pair[1] == cmd {
-			src := pair[0]
-			if len(src) > 0 {
-				acc = append(acc, src)
+func connectionsTo(cmd string, connections []connection) ([]string, []ScanMethod) {
+	fromCmds := make([]string, 0)
+	fromScanMethods := make([]ScanMethod, 0)
+	for _, conn := range connections {
+		if conn.toCmd == cmd {
+			if len(conn.fromCmd) > 0 { // TODO: PROBABLY UNNECESSARY
+				fromCmds = append(fromCmds, conn.fromCmd)
+				fromScanMethods = append(fromScanMethods, conn.fromScanMethod)
 			}
 		}
 	}
-	return acc
+	return fromCmds, fromScanMethods
 }
 
-func findForkConnections(connectedPairs [][]string) map[string][]string {
-	forkConnections := make(map[string][]string)
-	for _, pair := range connectedPairs {
-		fromCmd := pair[0]
-		connectedTo := connectionsFrom(fromCmd, connectedPairs)
-		if len(connectedTo) > 1 {
-			forkConnections[fromCmd] = connectedTo
+type forkConnection struct {
+	fromCmd string
+	toCmds  []string
+}
+
+func findForkConnections(connections []connection) []forkConnection {
+	doneForFromCmd := make(map[string]bool)
+	forkConnections := make([]forkConnection, 0)
+	for _, conn := range connections {
+		_, done := doneForFromCmd[conn.fromCmd]
+		if !done {
+			toCmds := connectionsFrom(conn.fromCmd, connections)
+			if len(toCmds) > 1 {
+				forkConn := forkConnection{
+					fromCmd: conn.fromCmd,
+					toCmds:  toCmds,
+				}
+				forkConnections = append(forkConnections, forkConn)
+				doneForFromCmd[conn.fromCmd] = true
+			}
+			// TODO: TEST
+			// else {
+			// 	doneForFromCmd[fromCmd] = true
+			// }
 		}
 	}
 	return forkConnections
 }
 
-func findMergeConnections(connectedPairs [][]string) map[string][]string {
-	mergeConnections := make(map[string][]string)
-	for _, pair := range connectedPairs {
-		toCmd := pair[1]
-		connectedFrom := connectionsTo(toCmd, connectedPairs)
-		if len(connectedFrom) > 1 {
-			mergeConnections[toCmd] = connectedFrom
+type mergeConnection struct {
+	fromCmds []string
+	toCmd    string
+}
+
+func findMergeConnections(connections []connection) []mergeConnection {
+	doneForToCmd := make(map[string]bool)
+	mergeConnections := make([]mergeConnection, 0)
+	for _, conn := range connections {
+		_, done := doneForToCmd[conn.toCmd]
+		if !done {
+			fromCmds, _ := connectionsTo(conn.toCmd, connections)
+			if len(fromCmds) > 1 {
+				mergeConn := mergeConnection{
+					fromCmds: fromCmds,
+					toCmd:    conn.toCmd,
+				}
+				mergeConnections = append(mergeConnections, mergeConn)
+				doneForToCmd[conn.toCmd] = true
+			}
+			// TODO: TEST
+			// else {
+			// 	doneForToCmd[toCmd] = true
+			// }
 		}
 	}
 	return mergeConnections
 }
 
-func findPipeConnections(connectedPairs [][]string) map[string]string {
-	pipeConnections := make(map[string]string)
-	for _, pair := range connectedPairs {
-		fromCmd := pair[0]
-		toCmd := pair[1]
-		connectedTo := connectionsFrom(fromCmd, connectedPairs)
-		connectedFrom := connectionsTo(toCmd, connectedPairs)
-		if len(connectedTo) == 1 && len(connectedFrom) == 1 {
-			pipeConnections[fromCmd] = connectedTo[0]
+type pipeConnection struct {
+	fromCmd string
+	toCmd   string
+}
+
+func findPipeConnections(connections []connection) []pipeConnection {
+	doneForFromCmd := make(map[string]bool)
+	pipeConnections := make([]pipeConnection, 0)
+	for _, conn := range connections {
+		_, done := doneForFromCmd[conn.fromCmd]
+		if !done {
+			toCmds := connectionsFrom(conn.fromCmd, connections)
+			fromCmds, _ := connectionsTo(conn.toCmd, connections)
+			if len(toCmds) == 1 && len(fromCmds) == 1 {
+				pipeConn := pipeConnection{
+					fromCmd: fromCmds[0],
+					toCmd:   toCmds[0],
+				}
+				pipeConnections = append(pipeConnections, pipeConn)
+				doneForFromCmd[conn.fromCmd] = true
+			}
+			// TODO: TEST
+			// else {
+			// 	doneForFromCmd[fromCmd] = true
+			// }
 		}
 	}
 	return pipeConnections
 }
 
-func findInputOutputConnection(connectedPairs [][]string) map[string]string {
+type inputOutputConnection struct {
+	inputTo         string
+	inputScanMethod ScanMethod
+	outputFrom      string
+}
+
+func findInputOutputConnection(connections []connection) []inputOutputConnection {
 	var inputTo, outputFrom string
-	for _, pair := range connectedPairs {
-		fromCmd := strings.TrimSpace(pair[0])
-		toCmd := strings.TrimSpace(pair[1])
+	var inputScanMethod ScanMethod
+	for _, conn := range connections {
+		fromCmd := strings.TrimSpace(conn.fromCmd)
+		toCmd := strings.TrimSpace(conn.toCmd)
 		if len(fromCmd) == 0 && len(toCmd) > 0 {
 			inputTo = toCmd
+			inputScanMethod = conn.fromScanMethod
 		}
 		if len(fromCmd) > 0 && len(toCmd) == 0 {
 			outputFrom = fromCmd
 		}
 	}
 	if len(inputTo) == 0 && len(outputFrom) == 0 {
-		return map[string]string{}
+		return []inputOutputConnection{}
 	}
-	return map[string]string{inputTo: outputFrom}
+	return []inputOutputConnection{
+		inputOutputConnection{
+			inputTo:         inputTo,
+			inputScanMethod: inputScanMethod,
+			outputFrom:      outputFrom,
+		},
+	}
 }

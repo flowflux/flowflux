@@ -42,62 +42,62 @@ func NewHeavyDutyScanner(reader io.Reader, delimiter []byte) *HeavyDutyScanner {
 }
 
 // Scan ...
-func (m *HeavyDutyScanner) Scan() bool {
-	m.message = nil
-	m.decodedMessage = nil
-	m.delimitedMessage = nil
+func (h *HeavyDutyScanner) Scan() bool {
+	h.message = nil
+	h.decodedMessage = nil
+	h.delimitedMessage = nil
 
 	var buffer []byte
-	if len(m.rest) > 0 {
-		buffer = append(buffer, m.rest...)
-		m.rest = nil
+	if len(h.rest) > 0 {
+		buffer = append(buffer, h.rest...)
+		h.rest = nil
 	}
 
 	for {
-		line, err := m.reader.ReadBytes('\n')
+		line, err := h.reader.ReadBytes('\n')
 		if err != nil {
-			m.err = err
+			h.err = err
 			return false
 		}
 		buffer = append(buffer, line...)
-		idx := bytes.Index(buffer, m.delimiter)
+		idx := bytes.Index(buffer, h.delimiter)
 		if idx > -1 {
-			m.message = buffer[:idx]
-			m.rest = buffer[idx+len(m.delimiter):]
+			h.message = buffer[:idx]
+			h.rest = buffer[idx+len(h.delimiter):]
 			return true
 		}
 	}
 }
 
 // Message ...
-func (m *HeavyDutyScanner) Message() []byte {
-	return m.message
+func (h *HeavyDutyScanner) Message() []byte {
+	return h.message
 }
 
 // DecodedMessage ...
-func (m *HeavyDutyScanner) DecodedMessage() ([]byte, error) {
-	if m.decodedMessage == nil {
-		if m.Decode == nil {
+func (h *HeavyDutyScanner) DecodedMessage() ([]byte, error) {
+	if h.decodedMessage == nil {
+		if h.Decode == nil {
 			return nil, fmt.Errorf("No decoder provided")
 		}
-		decodedMessage, err := m.Decode(m.message)
+		decodedMessage, err := h.Decode(h.message)
 		if err != nil {
 			return nil, err
 		}
-		m.decodedMessage = decodedMessage
+		h.decodedMessage = decodedMessage
 	}
-	return m.decodedMessage, nil
+	return h.decodedMessage, nil
 }
 
 // DelimitedMessage ...
-func (m *HeavyDutyScanner) DelimitedMessage() []byte {
-	if m.delimitedMessage == nil {
-		m.delimitedMessage = append(m.message, m.delimiter...)
+func (h *HeavyDutyScanner) DelimitedMessage() []byte {
+	if h.delimitedMessage == nil {
+		h.delimitedMessage = append(h.message, h.delimiter...)
 	}
-	return m.delimitedMessage
+	return h.delimitedMessage
 }
 
 // Err ...
-func (m *HeavyDutyScanner) Err() error {
-	return m.err
+func (h *HeavyDutyScanner) Err() error {
+	return h.err
 }
