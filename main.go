@@ -1,6 +1,10 @@
 package main
 
 import (
+	"flowflux/cleanup"
+	"flowflux/fifos"
+	"flowflux/nodecollection"
+	"flowflux/runner"
 	"fmt"
 	"log"
 	"os"
@@ -15,12 +19,12 @@ func main() {
 		printHelp()
 		return
 	} else if argsLen == 1 {
-		coll := NewNodeCollection(args[0])
-		err := validateNodeCollection(coll)
+		coll := nodecollection.NewCollection(args[0])
+		err := runner.ValidateCollection(coll)
 		if err != nil {
 			log.Fatal(err)
 		}
-		runNodeCollection(coll)
+		runner.RunCollection(coll)
 		return
 	}
 
@@ -30,14 +34,14 @@ func main() {
 			fmt.Println("Not enough arguments for pipe:")
 			printPipeHelp()
 		} else {
-			startPipe(args[1])
+			fifos.StartPipe(args[1])
 		}
 	case "fork":
 		if argsLen < 4 {
 			fmt.Println("Not enough arguments for fork:")
 			printForkHelp()
 		} else {
-			startFork(args[1], args[2:])
+			fifos.StartFork(args[1], args[2:])
 		}
 	case "merge":
 		if argsLen < 4 {
@@ -45,20 +49,20 @@ func main() {
 			printMergeHelp()
 		} else {
 			lastIdx := len(args) - 1
-			startMerge(args[1:lastIdx], args[lastIdx])
+			fifos.StartMerge(args[1:lastIdx], args[lastIdx])
 		}
 	case "input":
 		if argsLen < 2 {
 			fmt.Println("Not enough arguments for input:")
 			printInputHelp()
 		} else {
-			startInput(args[1])
+			fifos.StartInput(args[1])
 		}
 	case "cleanup":
 		if argsLen < 2 {
-			startCleanup(".")
+			cleanup.Start(".")
 		} else {
-			startCleanup(args[1])
+			cleanup.Start(args[1])
 		}
 	default:
 		printHeader()

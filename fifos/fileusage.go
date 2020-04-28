@@ -1,4 +1,4 @@
-package main
+package fifos
 
 import (
 	"os"
@@ -16,7 +16,7 @@ func isUsable(filePath string) bool {
 	return info.Mode()&os.ModeNamedPipe != 0
 }
 
-func createOpenFile(filePath string) (*os.File, error) {
+func createOpenFifo(filePath string) (*os.File, error) {
 	if !isUsable(filePath) {
 		os.Remove(filePath)
 		err := syscall.Mkfifo(filePath, 0666)

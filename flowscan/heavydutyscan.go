@@ -1,4 +1,4 @@
-package main
+package flowscan
 
 import (
 	"bufio"
@@ -21,8 +21,8 @@ func DecodeBase64Message(encodedMessage []byte) ([]byte, error) {
 	return decodedMessage, nil
 }
 
-// HeavyDutyScanner implements the secret sauce that makes it work reliably.
-type HeavyDutyScanner struct {
+// HeavyDuty implements the secret sauce that makes it work reliably.
+type HeavyDuty struct {
 	reader           *bufio.Reader
 	delimiter        []byte
 	message          []byte
@@ -33,16 +33,16 @@ type HeavyDutyScanner struct {
 	Decode           func([]byte) ([]byte, error)
 }
 
-// NewHeavyDutyScanner ...
-func NewHeavyDutyScanner(reader io.Reader, delimiter []byte) *HeavyDutyScanner {
-	return &HeavyDutyScanner{
+// NewHeavyDuty ...
+func NewHeavyDuty(reader io.Reader, delimiter []byte) *HeavyDuty {
+	return &HeavyDuty{
 		reader:    bufio.NewReader(reader),
 		delimiter: delimiter,
 	}
 }
 
 // Scan ...
-func (h *HeavyDutyScanner) Scan() bool {
+func (h *HeavyDuty) Scan() bool {
 	h.message = nil
 	h.decodedMessage = nil
 	h.delimitedMessage = nil
@@ -70,12 +70,12 @@ func (h *HeavyDutyScanner) Scan() bool {
 }
 
 // Message ...
-func (h *HeavyDutyScanner) Message() []byte {
+func (h *HeavyDuty) Message() []byte {
 	return h.message
 }
 
 // DecodedMessage ...
-func (h *HeavyDutyScanner) DecodedMessage() ([]byte, error) {
+func (h *HeavyDuty) DecodedMessage() ([]byte, error) {
 	if h.decodedMessage == nil {
 		if h.Decode == nil {
 			return nil, fmt.Errorf("No decoder provided")
@@ -90,7 +90,7 @@ func (h *HeavyDutyScanner) DecodedMessage() ([]byte, error) {
 }
 
 // DelimitedMessage ...
-func (h *HeavyDutyScanner) DelimitedMessage() []byte {
+func (h *HeavyDuty) DelimitedMessage() []byte {
 	if h.delimitedMessage == nil {
 		h.delimitedMessage = append(h.message, h.delimiter...)
 	}
@@ -98,6 +98,6 @@ func (h *HeavyDutyScanner) DelimitedMessage() []byte {
 }
 
 // Err ...
-func (h *HeavyDutyScanner) Err() error {
+func (h *HeavyDuty) Err() error {
 	return h.err
 }

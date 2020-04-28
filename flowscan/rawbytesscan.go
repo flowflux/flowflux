@@ -1,12 +1,12 @@
-package main
+package flowscan
 
 import (
 	"bufio"
 	"io"
 )
 
-// RawBytesScanner implements the secret sauce that makes it work reliably.
-type RawBytesScanner struct {
+// RawBytes implements the secret sauce that makes it work reliably.
+type RawBytes struct {
 	reader  *bufio.Reader
 	buffer  []byte
 	message []byte
@@ -14,17 +14,17 @@ type RawBytesScanner struct {
 	err     error
 }
 
-// NewRawBytesScanner ...
-func NewRawBytesScanner(reader io.Reader) *RawBytesScanner {
+// NewRawBytes ...
+func NewRawBytes(reader io.Reader) *RawBytes {
 	buffReader := bufio.NewReader(reader)
-	return &RawBytesScanner{
+	return &RawBytes{
 		reader: buffReader,
 		buffer: make([]byte, buffReader.Size()),
 	}
 }
 
 // Scan ...
-func (r *RawBytesScanner) Scan() bool {
+func (r *RawBytes) Scan() bool {
 	r.message = nil
 	for {
 		n, err := r.reader.Read(r.buffer)
@@ -40,7 +40,7 @@ func (r *RawBytesScanner) Scan() bool {
 }
 
 // Message ...
-func (r *RawBytesScanner) Message() []byte {
+func (r *RawBytes) Message() []byte {
 	if r.message == nil {
 		r.message = make([]byte, r.number)
 		copy(r.message, r.buffer)
@@ -49,6 +49,6 @@ func (r *RawBytesScanner) Message() []byte {
 }
 
 // Err ...
-func (r *RawBytesScanner) Err() error {
+func (r *RawBytes) Err() error {
 	return r.err
 }

@@ -1,21 +1,24 @@
-package main
+package fifos
 
 import (
+	"flowflux/flowscan"
+	"flowflux/printer"
 	"fmt"
 	"io"
 	"log"
 )
 
-func startPipe(name string) {
+// StartPipe ...
+func StartPipe(name string) {
 	usrWrFilepath := fmt.Sprintf("%s.wr", name)
 	usrRdFilepath := fmt.Sprintf("%s.rd", name)
 
-	usrWrFile, err := createOpenFile(usrWrFilepath)
+	usrWrFile, err := createOpenFifo(usrWrFilepath)
 	if err != nil {
 		log.Fatal("Error making/opening named pipe for writing: ", err)
 	}
 
-	usrRdFile, err := createOpenFile(usrRdFilepath)
+	usrRdFile, err := createOpenFifo(usrRdFilepath)
 	if err != nil {
 		log.Fatal("Error making/opening named pipe for reading: ", err)
 	}
@@ -28,8 +31,8 @@ func startPipe(name string) {
 }
 
 func runPipe(usrWrFile io.Reader, usrRdFile io.Writer) error {
-	scanner := NewHeavyDutyScanner(usrWrFile, MsgDelimiter)
-	scanner.Decode = DecodeBase64Message
+	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
+	scanner.Decode = flowscan.DecodeBase64Message
 
 	for scanner.Scan() {
 		msg, err := scanner.DecodedMessage()
@@ -37,7 +40,7 @@ func runPipe(usrWrFile io.Reader, usrRdFile io.Writer) error {
 			return err
 		}
 
-		printLogLn(fmt.Sprintf("PIPING: %s", msg))
+		printer.LogLn(fmt.Sprintf("PIPING: %s", msg))
 
 		_, err = usrRdFile.Write(scanner.DelimitedMessage())
 		if err != nil {

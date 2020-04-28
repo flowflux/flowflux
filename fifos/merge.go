@@ -1,6 +1,8 @@
-package main
+package fifos
 
 import (
+	"flowflux/flowscan"
+	"flowflux/printer"
 	"fmt"
 	"io"
 	"log"
@@ -8,14 +10,15 @@ import (
 	"strings"
 )
 
-func startMerge(usrWrNames []string, usrRdName string) {
+// StartMerge ...
+func StartMerge(usrWrNames []string, usrRdName string) {
 	usrWrFilepaths := make([]string, len(usrWrNames))
 	usrWrFiles := make([]*os.File, len(usrWrNames))
 	for i, usrWrName := range usrWrNames {
 		usrWrFilepath := fmt.Sprintf("%s.wr", usrWrName)
 		usrWrFilepaths[i] = usrWrFilepath
 
-		usrWrFile, err := createOpenFile(usrWrFilepath)
+		usrWrFile, err := createOpenFifo(usrWrFilepath)
 		if err != nil {
 			log.Fatal("Error making/opening named pipe for writing: ", err)
 		}
@@ -29,7 +32,7 @@ func startMerge(usrWrNames []string, usrRdName string) {
 
 	usrRdFilepath := fmt.Sprintf("%s.rd", usrRdName)
 
-	usrRdFile, err := createOpenFile(usrRdFilepath)
+	usrRdFile, err := createOpenFifo(usrRdFilepath)
 	if err != nil {
 		log.Fatal("Error making/opening named pipe for reading: ", err)
 	}
@@ -57,7 +60,7 @@ func runMerge(usrWrFiles []io.Reader, usrRdFile io.Writer) {
 				log.Fatalln("Error dispatching merge message:", err)
 			}
 		case logMsg := <-logging:
-			printLogLn(logMsg)
+			printer.LogLn(logMsg)
 		case err := <-errors:
 			log.Println(err)
 		case err := <-quit:
@@ -79,8 +82,8 @@ func scanReader(
 	errors chan<- error,
 	quit chan<- error,
 ) {
-	scanner := NewHeavyDutyScanner(usrWrFile, MsgDelimiter)
-	scanner.Decode = DecodeBase64Message
+	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
+	scanner.Decode = flowscan.DecodeBase64Message
 
 	for scanner.Scan() {
 		msg, err := scanner.DecodedMessage()

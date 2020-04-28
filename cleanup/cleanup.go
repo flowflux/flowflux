@@ -1,4 +1,4 @@
-package main
+package cleanup
 
 import (
 	"fmt"
@@ -8,7 +8,8 @@ import (
 	"path"
 )
 
-func startCleanup(dirName string) {
+// Start ...
+func Start(dirName string) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal("Error getting current working directory: ", err)
@@ -18,13 +19,13 @@ func startCleanup(dirName string) {
 	if err != nil {
 		log.Fatal("Error reading directory: ", cleanupDir, ": ", err)
 	}
-	err = runCleanup(cleanupDir, files)
+	err = run(cleanupDir, files)
 	if err != nil {
 		log.Fatal("Error running cleanup on directory: ", cleanupDir, ": ", err)
 	}
 }
 
-func runCleanup(basePath string, files []os.FileInfo) error {
+func run(basePath string, files []os.FileInfo) error {
 	cleanedUpCount := 0
 	for _, fi := range files {
 		ext := path.Ext(fi.Name())

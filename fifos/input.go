@@ -1,8 +1,9 @@
-package main
+package fifos
 
 import (
 	"bufio"
 	"encoding/base64"
+	"flowflux/flowscan"
 	"fmt"
 	"io"
 	"log"
@@ -10,8 +11,9 @@ import (
 	"strings"
 )
 
-func startInput(usrRdFilepath string) {
-	usrRdFile, err := createOpenFile(usrRdFilepath)
+// StartInput ...
+func StartInput(usrRdFilepath string) {
+	usrRdFile, err := createOpenFifo(usrRdFilepath)
 	if err != nil {
 		log.Fatal("Error making/opening named pipe for reading: ", err)
 	}
@@ -39,7 +41,7 @@ func runInput(usrWrFile io.Reader, usrRdFile io.Writer) error {
 		msgB64 := make([]byte, base64.StdEncoding.EncodedLen(len(msg)))
 
 		base64.StdEncoding.Encode(msgB64, msg)
-		msgB64 = append(msgB64, MsgDelimiter...)
+		msgB64 = append(msgB64, flowscan.MsgDelimiter...)
 		_, err = usrRdFile.Write(msgB64)
 		if err != nil {
 			return err

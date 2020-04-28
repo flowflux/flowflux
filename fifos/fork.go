@@ -1,6 +1,8 @@
-package main
+package fifos
 
 import (
+	"flowflux/flowscan"
+	"flowflux/printer"
 	"fmt"
 	"io"
 	"log"
@@ -8,10 +10,11 @@ import (
 	"strings"
 )
 
-func startFork(usrWrName string, usrRdNames []string) {
+// StartFork ...
+func StartFork(usrWrName string, usrRdNames []string) {
 	usrWrFilepath := fmt.Sprintf("%s.wr", usrWrName)
 
-	usrWrFile, err := createOpenFile(usrWrFilepath)
+	usrWrFile, err := createOpenFifo(usrWrFilepath)
 	if err != nil {
 		log.Fatal("Error making/opening named pipe for writing: ", err)
 	}
@@ -22,7 +25,7 @@ func startFork(usrWrName string, usrRdNames []string) {
 		usrRdFilepath := fmt.Sprintf("%s.rd", usrRdName)
 		usrRdFilepaths[i] = usrRdFilepath
 
-		usrRdFile, err := createOpenFile(usrRdFilepath)
+		usrRdFile, err := createOpenFifo(usrRdFilepath)
 		if err != nil {
 			log.Fatal("Error making/opening named pipe for reading: ", err)
 		}
@@ -42,15 +45,15 @@ func startFork(usrWrName string, usrRdNames []string) {
 }
 
 func runFork(usrWrFile io.Reader, usrRdFiles []io.Writer) error {
-	scanner := NewHeavyDutyScanner(usrWrFile, MsgDelimiter)
-	scanner.Decode = DecodeBase64Message
+	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
+	scanner.Decode = flowscan.DecodeBase64Message
 
 	for scanner.Scan() {
 		msg, err := scanner.DecodedMessage()
 		if err != nil {
 			return err
 		}
-		printLogLn(fmt.Sprintf("FORKING: %s", msg))
+		printer.LogLn(fmt.Sprintf("FORKING: %s", msg))
 
 		for _, usrRdFile := range usrRdFiles {
 			_, err = usrRdFile.Write(scanner.DelimitedMessage())
