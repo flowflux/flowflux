@@ -22,7 +22,7 @@ const server = http.createServer((request, response) => {
 
 server.listen(port, (err) => {
   if (err) {
-    return console.error('something bad happened', err);
+    console.error('Error starting server:', err);
   } else {
     console.error(`Server running @ http://localhost:${port}`);
   }

@@ -3,11 +3,12 @@ package runner
 import (
 	"bufio"
 	"flowflux/flowscan"
+	"flowflux/load"
 	"flowflux/nodecollection"
 	"io"
 	"log"
 	"os/exec"
-	"strings"
+	"time"
 )
 
 // ProcessRunner ...
@@ -16,6 +17,7 @@ type ProcessRunner struct {
 	findOutputRunners func(Runner) []Runner
 	channel           chan InputMessage
 	processErrorMsgs  chan<- []byte
+	load              uint64
 }
 
 // Node ...
@@ -90,46 +92,52 @@ func (p ProcessRunner) Start() {
 	}
 
 	// FUTURE FEATURE CODE TO OBSERVE CPU-LOAD OF PROCESS
-	//
-	// loadSample := load.StartSampling(cmd.Process.Pid, 1*time.Second)
-	//
-	// for {
-	// 	select {
-	// 	case message := <-p.channel:
-	// 		if message.EOF {
-	// 			cmdIn.Close()
-	// 		} else {
-	// 			_, err := cmdIn.Write(message.payload)
-	// 			if err != nil {
-	// 				log.Fatalf(
-	// 					"Error writing to stdin of %s %s: %s",
-	// 					p.node.Process.Command,
-	// 					strings.Join(p.node.Process.Arguments, ", "),
-	// 					err,
-	// 				)
-	// 			}
-	// 		}
-	// 	case sample := <-loadSample:
-	// 		printer.LogLn(sample.String())
-	// 	}
-	// }
+	// AUTO-SCALING
 
-	for message := range p.channel {
-		if message.EOF {
-			cmdIn.Close()
-		} else {
-			_, err := cmdIn.Write(message.payload)
-			if err != nil {
-				log.Fatalf(
-					"Error writing to stdin of %s %s: %s",
-					p.node.Process.Command,
-					strings.Join(p.node.Process.Arguments, ", "),
-					err,
-				)
+	var loadSample <-chan uint64
+	if p.node.Process.AutoScale {
+		loadSample = load.StartSampling(cmd.Process.Pid, 1*time.Second)
+	}
+
+	for {
+		select {
+		case message := <-p.channel:
+			if message.EOF {
+				cmdIn.Close()
+			} else {
+				_, err := cmdIn.Write(message.payload)
+				if err != nil {
+					log.Fatalf(
+						"Error writing to stdin of \"%s\": %s",
+						p.node.Process.String(),
+						err,
+					)
+				}
 			}
+		case sample := <-loadSample:
+			p.load = sample
 		}
 	}
+
+	// for message := range p.channel {
+	// 	if message.EOF {
+	// 		cmdIn.Close()
+	// 	} else {
+	// 		_, err := cmdIn.Write(message.payload)
+	// 		if err != nil {
+	// 			log.Fatalf(
+	// 				"Error writing to stdin of %s %s: %s",
+	// 				p.node.Process.Command,
+	// 				strings.Join(p.node.Process.Arguments, ", "),
+	// 				err,
+	// 			)
+	// 		}
+	// 	}
+	// }
 }
+
+// Load ...
+func (p ProcessRunner) Load() uint64 { return p.load }
 
 // Input ...
 func (p ProcessRunner) Input() chan<- InputMessage { return p.channel }

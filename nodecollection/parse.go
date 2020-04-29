@@ -115,7 +115,8 @@ func parseHubFile(filePath string) map[string]Node {
 	return mainIndex
 }
 
-func parseProcessCommand(command string) ProcessCommand {
+func parseProcessCommand(rawCommand string) ProcessCommand {
+	command, autoScale := extractAutoScale(rawCommand)
 	rawSplit := strings.Split(command, " ")
 	comps := make([]string, 0)
 	for _, comp := range rawSplit {
@@ -127,7 +128,17 @@ func parseProcessCommand(command string) ProcessCommand {
 	return ProcessCommand{
 		Command:   comps[0],
 		Arguments: comps[1:],
+		AutoScale: autoScale,
 	}
+}
+
+func extractAutoScale(cmd string) (string, bool) {
+	re := regexp.MustCompile(`\+(.+?)\+`)
+	loc := re.FindStringSubmatchIndex(cmd)
+	if loc == nil {
+		return cmd, false
+	}
+	return strings.TrimSpace(cmd[loc[2]:loc[3]]), true
 }
 
 func parseConnections(fileContent []byte) []connection {

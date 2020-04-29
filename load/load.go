@@ -13,31 +13,10 @@ import (
 // To be able to spawn parallel actors if load of one is getting too high.
 // Additional syntax needed for flow.def.
 
-// Sample ...
-type Sample struct {
-	Comm   string
-	Utime  uint64
-	Stime  uint64
-	Cutime uint64
-	Cstime uint64
-}
-
-func (s Sample) String() string {
-	return fmt.Sprintf(
-		"%s, Utime: %d, Stime: %d, Cutime: %d, Cstime: %d",
-		s.Comm,
-		s.Utime,
-		s.Stime,
-		s.Cutime,
-		s.Cstime,
-	)
-}
-
 // https://linux.die.net/man/5/proc
 
 // Classes ...
 const (
-	CommIdx   = 1
 	UtimeIdx  = 13
 	StimeIdx  = 14
 	CutimeIdx = 15
@@ -45,8 +24,8 @@ const (
 )
 
 // StartSampling ...
-func StartSampling(pid int, every time.Duration) <-chan Sample {
-	channel := make(chan Sample)
+func StartSampling(pid int, every time.Duration) <-chan uint64 {
+	channel := make(chan uint64)
 	go func() {
 		for {
 			sample, err := takeSample(pid)
@@ -60,20 +39,17 @@ func StartSampling(pid int, every time.Duration) <-chan Sample {
 	return channel
 }
 
-func takeSample(pid int) (Sample, error) {
+func takeSample(pid int) (uint64, error) {
 	procStatPath := fmt.Sprintf("/proc/%d/stat", pid)
 	contents, err := ioutil.ReadFile(procStatPath)
 	if err != nil {
-		return Sample{}, err
+		return 0, err
 	}
 	fields := bytes.Fields(contents)
-	sample := Sample{
-		Comm:   parseStringValue(CommIdx, fields),
-		Utime:  parseUint64Value(UtimeIdx, fields, pid),
-		Stime:  parseUint64Value(StimeIdx, fields, pid),
-		Cutime: parseUint64Value(CutimeIdx, fields, pid),
-		Cstime: parseUint64Value(CstimeIdx, fields, pid),
-	}
+	sample := parseUint64Value(UtimeIdx, fields, pid)
+	sample += parseUint64Value(StimeIdx, fields, pid)
+	sample += parseUint64Value(CutimeIdx, fields, pid)
+	sample += parseUint64Value(CstimeIdx, fields, pid)
 	return sample, nil
 }
 

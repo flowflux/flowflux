@@ -1,5 +1,10 @@
 package nodecollection
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Class ...
 type Class int
 
@@ -47,6 +52,15 @@ type Node struct {
 type ProcessCommand struct {
 	Command   string
 	Arguments []string
+	AutoScale bool
+}
+
+func (p ProcessCommand) String() string {
+	return fmt.Sprintf(
+		"%s %s",
+		p.Command,
+		strings.Join(p.Arguments, " "),
+	)
 }
 
 // ScanMethod ...
