@@ -1,12 +1,16 @@
 # FLOWFLUX
 
-Connect small, reactive processes in every programming language that can read and write to Stdin and Stdout in a flow graph to form applications.
+Actor-model concurrent computation utility. Connect small, reactive processes in every programming language in a flow graph to form more complex applications.
 
 ## Domain Key Words
 
-- Communicating processes are also known as actor-based concurrency (Erlang)
-- Processes are interconnected via a so called messaging-bus or event-bus (RabbitMQ, Kafka)
-- The form of programming is also known as event-driven, reactive, as well as fire-and-forget
+- Communicating processes 
+- Inter-process communication
+- Actor-model based concurrency (Erlang)
+- Event-driven
+- Reactive
+- Fire-and-forget
+- Messaging-bus or event-bus (RabbitMQ, Kafka)
 
 That means that flowflux can solve problems in the domains of concurrency and parallelism (actor pattern) as well as messaging queues (RabbitMQ).
 
@@ -14,7 +18,7 @@ That means that flowflux can solve problems in the domains of concurrency and pa
 
 - Easy to handle form of parallel/concurrent programming
 - Easy to handle form of inter-process-communication between programs in different programming languages
-- Faster than the same thing via sockets or network interface, no port-management required
+- Faster than the same thing via network interface, no port-management required
 - Unix pipes are cool and everything that makes them usable for more problems is highly welcome 
 - Communication between processes can be visualized
 
@@ -38,13 +42,22 @@ Messages/events flow through a process/actor via `stdin` and `stdout`. Stream-co
 
 ## Simple Wire Format
 
-There is a standard wire format for messages/events: JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope is used: the message is bas64-encoded with the delimiter `\n---\n`. Th reasons for this are pervasiveness of base64, ease of use and the resulting robustness of parsing and queuing. Optionally raw byte streams can be used by defining connections with `*->` instead of  `->`.
+When development on this idea started, it became clear quite fast, that data transfer between different programming languages and how they handle binary data streams isn't easy to get reliable. Many different solutions where tried (length-prefixed streams, character-separated messages. etc.pp.). The following combination turned out to be a rock solid solution, though pure binary streams that are not segmented automatically at message-boundaries are supported too.
+
+Messages/events themselves are JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope layer is used: The message is base64-encoded and suffixed with the delimiter `\n---\n`. This seems unnecessary at first, but a pure JSON wire-format would require 100% control over how the JSON is generated and how it's data is escaped. An additional base64 envelope is an equally pervasive solution that gives communication robustness. The delimiter `\n---\n` is nicely recognizable in between any form of generated base64.
+
+As mentioned before, raw byte streams are supported too if flow is used as a communication hub with a `flow.def` file. A connection specified with `*->` instead of `->` stands for a raw binary stream.
 
 ## Usage
 
-First the `flow` command line tool is used to set up the infrastructure of named pipes. Usually automated by a shell-script. Second the actual actors/processes are started with their Stdin and Stdout connected to the named pipes.
+Flow allows for 2 different ways to run applications:
 
-### `flow` CLI usage
+1. With flow as communication hub, the most comfortable one
+2. With flow managing a collection of named UNIX pipes
+
+Please see the example folder. The web-server is usable in both ways.
+
+### `flow` CLI
 
 ```bash
 $ ./flow
@@ -102,13 +115,13 @@ node merge-response.js -> node web-server.js
 And run as follows:
 
 ```bash
-$ ./flow flow.flow
+$ ./flow flow.def
 ```
 
-Alternatively `flow` CLI can be used to manage a collection of named UNIX pipes. See [example/README.md](example/README.md) for details.
+Alternatively `flow` CLI can be used to manage a collection of named UNIX pipes. See [examples/README.md](examples/README.md) for details.
 
 ### Example folder
 
 The example folder contains an actor-based static web-server implementation in NodeJS. Where each process follows a fire-and-forget-strategy. Messages/events are running in one direction only. Both things eliminate all problems and difficulties of concurrency and parallel-programming at once. 
 
-The file [example/flow-messaging.js](example/flow-messaging.js) contains the only API necessary, to get the implementation DRY, in 36 LOCs. Porting it to other programming languages should be simple.
+The file [examples/flow-messaging.js](examples/flow-messaging.js) contains the only API necessary, to get the implementation DRY, in 36 LOCs. Porting it to other programming languages should be simple.

@@ -1,6 +1,5 @@
 const {ParseMessage, SendMessage} = require('../flow-messaging');
 const send = SendMessage(process.stdout);
-const fs = require('fs');
 const Jimp = require('jimp');
 
 const actions = {
@@ -11,6 +10,7 @@ const actions = {
       input.reverse();
       const images = await Promise.all(input.map(i => Jimp.read(i.filename)))
       const workingLayer = images[0];
+      
       let width = workingLayer.bitmap.width;
       let height = workingLayer.bitmap.height;
       for (let i = 1; i < images.length; i++) {
@@ -18,6 +18,7 @@ const actions = {
         width = Math.max(width, layer.bitmap.width);
         height = Math.max(height, layer.bitmap.height);
       }
+
       workingLayer.contain(width, height);
       for (let i = 1; i < images.length; i++) {
         const layer = images[i];
@@ -28,19 +29,32 @@ const actions = {
           {mode: jimpBlendMode[blendMode]},
         );
       }
-      await workingLayer.writeAsync(output.filename);
+
       const buff = await workingLayer
         .quality(output.quality)
         .getBufferAsync(jimpMime[output.format]);
-      send({
-        cmd: 'WRITE',
-        filename: output.filename,
-        payload: buff.toString('base64'),
-        encoding: 'base64',
-      });
+      
+      send({ cmd: 'OPEN_FILE', filename: output.filename });
+
+      const chunkSize = 2048;
+      for (let start = 0; start < buff.length; start+=chunkSize) {
+        const end = start + chunkSize;
+        const chunk = end < buff.length
+          ? buff.slice(start, end)
+          : buff.slice(start);
+        send({
+          cmd: 'WRITE_CHUNK',
+          chunk: chunk.toString('base64'),
+          encoding: 'base64',
+        });
+      }
+
+      send({ cmd: 'CLOSE_FILE' });
     }
   }
 }
+
+process.stdin.on('data', ParseMessage(msg => actions[msg.cmd](msg)));
 
 const jimpBlendMode = {
   SOURCE_OVER: Jimp.BLEND_SOURCE_OVER,
@@ -60,5 +74,3 @@ const jimpMime = {
   JPEG: Jimp.MIME_JPEG,
   BMP: Jimp.MIME_BMP,
 };
-
-process.stdin.on('data', ParseMessage(msg => actions[msg.cmd](msg)));
