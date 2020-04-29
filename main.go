@@ -71,9 +71,9 @@ func main() {
 }
 
 func printHeader() {
-	fmt.Println("approx/hub -- utility to build actor-based systems by composing command line processes")
-	fmt.Println("Usage with <hub.flow> file:")
-	fmt.Println("  ./hub <path-to-file>")
+	fmt.Println("flowflux -- utility to build actor-based systems by composing command line processes")
+	fmt.Println("Usage with flow-definition (flow.def) file:")
+	fmt.Println("  $ flow <path-to-file>")
 }
 
 func printHelp() {
@@ -85,22 +85,22 @@ func printHelp() {
 	printCleanupHelp()
 }
 func printPipeHelp() {
-	fmt.Println("  pipe <name>")
+	fmt.Println("  $ pipe <name>")
 	fmt.Println("    Pipe message stream from <name>.wr to <name>.rd")
 }
 func printForkHelp() {
-	fmt.Println("  fork <wr-name> <rd-name-1> <rd-name-2> <...>")
+	fmt.Println("  $ fork <wr-name> <rd-name-1> <rd-name-2> <...>")
 	fmt.Println("    Fork message stream from wr-fifo into all provided rd-fifos")
 }
 func printMergeHelp() {
-	fmt.Println("  merge <wr-name-1> <wr-name-2> <...< <rd-name>")
+	fmt.Println("  $ merge <wr-name-1> <wr-name-2> <...< <rd-name>")
 	fmt.Println("    Merge message stream from all provided wr-fifos into rd-fifo")
 }
 func printInputHelp() {
-	fmt.Println("  input <name>")
+	fmt.Println("  $ input <name>")
 	fmt.Println("    Input JSON messages to stream them to <name>")
 }
 func printCleanupHelp() {
-	fmt.Println("  cleanup <directory>")
+	fmt.Println("  $ cleanup <directory>")
 	fmt.Println("    Cleanup directory from fifos (wr & rd)")
 }

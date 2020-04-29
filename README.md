@@ -2,16 +2,19 @@
 
 Connect small, reactive processes in every programming language that can read and write to Stdin and Stdout in a flow graph to form applications.
 
-- Communicating processes are also known as actor-based concurrency
-- Processes are interconnecting via a messaging-bus
-- The form of programming is also known as event-driven or reactive
-- The concurrency paradigm like actor based programming languages (Erlang) / messaging queues (RabbitMQ)
+## Domain Key Words
+
+- Communicating processes are also known as actor-based concurrency (Erlang)
+- Processes are interconnected via a so called messaging-bus or event-bus (RabbitMQ, Kafka)
+- The form of programming is also known as event-driven, reactive, as well as fire-and-forget
+
+That means that flowflux can solve problems in the domains of concurrency and parallelism (actor pattern) as well as messaging queues (RabbitMQ).
 
 ## Why?
 
 - Easy to handle form of parallel/concurrent programming
 - Easy to handle form of inter-process-communication between programs in different programming languages
-- Faster than the same thing via sockets or network interface, also no port-management required
+- Faster than the same thing via sockets or network interface, no port-management required
 - Unix pipes are cool and everything that makes them usable for more problems is highly welcome 
 - Communication between processes can be visualized
 
@@ -31,11 +34,11 @@ Connect small, reactive processes in every programming language that can read an
 
 ## Input, Output
 
-Messages/events flow through a process/actor via `stdin` and `stdout`. Stream-connectors are expressed as named pipes. The builtin actors "fork" and "merge" are used to splice and reunite the event streams. The builtin actors "pipe" is used to rewire any `stdout` to any `stdin` via a name pipe.
+Messages/events flow through a process/actor via `stdin` and `stdout`. Stream-connectors are expressed as named pipes or handled by Go channels (depending on which execution model is chosen). The builtin actors "fork" and "merge" are used to splice and reunite the event streams. The builtin actor "pipe" is used to rewire any `stdout` to any `stdin`.
 
 ## Simple Wire Format
 
-Messages/events are JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope is used: the message is bas64-encoded with the delimiter `\n---\n`. Th reasons for this are pervasiveness of base64, ease of use and the resulting robustness.
+There is a standard wire format for messages/events: JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope is used: the message is bas64-encoded with the delimiter `\n---\n`. Th reasons for this are pervasiveness of base64, ease of use and the resulting robustness of parsing and queuing. Optionally raw byte streams can be used by defining connections with `*->` instead of  `->`.
 
 ## Usage
 

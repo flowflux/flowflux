@@ -1,0 +1,16 @@
+{
+  "input": [
+    {
+      "filename": "mask.png",
+      "blendMode": "SOURCE_OVER"
+    },
+    {
+      "filename": "pipework.jpg"
+    }
+  ],
+  "output": {
+    "format": "JPEG",
+    "quality": 75,
+    "filename": "output.jpg"
+  }
+}

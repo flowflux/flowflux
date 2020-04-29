@@ -37,6 +37,8 @@ func (p ProcessRunner) Start() {
 		log.Fatal(err)
 	}
 
+	// cmd.Process.Pid
+
 	go func() {
 		scanner := bufio.NewScanner(cmdErr)
 		for scanner.Scan() {
@@ -86,6 +88,31 @@ func (p ProcessRunner) Start() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// FUTURE FEATURE CODE TO OBSERVE CPU-LOAD OF PROCESS
+	//
+	// loadSample := load.StartSampling(cmd.Process.Pid, 1*time.Second)
+	//
+	// for {
+	// 	select {
+	// 	case message := <-p.channel:
+	// 		if message.EOF {
+	// 			cmdIn.Close()
+	// 		} else {
+	// 			_, err := cmdIn.Write(message.payload)
+	// 			if err != nil {
+	// 				log.Fatalf(
+	// 					"Error writing to stdin of %s %s: %s",
+	// 					p.node.Process.Command,
+	// 					strings.Join(p.node.Process.Arguments, ", "),
+	// 					err,
+	// 				)
+	// 			}
+	// 		}
+	// 	case sample := <-loadSample:
+	// 		printer.LogLn(sample.String())
+	// 	}
+	// }
 
 	for message := range p.channel {
 		if message.EOF {
