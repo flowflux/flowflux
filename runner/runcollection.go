@@ -11,6 +11,8 @@ const concludeTimeoutDuration = 10 * time.Second
 
 // RunCollection ...
 func RunCollection(collection nodecollection.Collection) {
+	// TODO
+	// shouldScale := hasScalingNode(collection)
 	index := make(map[string]Runner)
 	findOutputRunners := func(r Runner) []Runner {
 		nodes := collection.Outputs(r.Node())
@@ -23,6 +25,8 @@ func RunCollection(collection nodecollection.Collection) {
 
 	processErrorMsgs := make(chan []byte)
 	didCloseOutput := make(chan bool)
+	// TODO
+	// var statistics load.Statistics
 
 	for _, id := range collection.IDs() {
 		n, _ := collection.Node(id)
@@ -90,6 +94,22 @@ func RunCollection(collection nodecollection.Collection) {
 		}
 	}
 
+	// TODO
+	// if shouldScale {
+	// 	statistics = load.NewStatistics()
+	// 	procs := make([]load.SampleProcess, 0)
+	// 	for _, r := range index {
+	// 		switch r.Node().Class {
+	// 		case nodecollection.ProcessClass:
+	// 			pr, ok := r.(ProcessRunner)
+	// 			if ok {
+	// 				procs = append(procs, pr)
+	// 			}
+	// 		}
+	// 	}
+	// 	go statistics.Start(procs)
+	// }
+
 	for {
 		breakLoop := false
 		select {
@@ -102,3 +122,14 @@ func RunCollection(collection nodecollection.Collection) {
 		}
 	}
 }
+
+// TODO
+// func hasScalingNode(collection nodecollection.Collection) bool {
+// 	for _, id := range collection.IDs() {
+// 		n, _ := collection.Node(id)
+// 		if n.Process.AutoScale {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }

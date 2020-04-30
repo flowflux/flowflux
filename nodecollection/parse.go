@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -86,7 +87,7 @@ func parseHubFile(filePath string) map[string]Node {
 			Class:      ProcessClass,
 			ID:         makeCmdID(uniProc.name),
 			ScanMethod: uniProc.scanMethod,
-			Process:    parseProcessCommand(uniProc.name),
+			Process:    parseConfig(uniProc.name),
 		}
 
 		next, ok := connectionIndex[pipeFromKey(uniProc.name)]
@@ -115,8 +116,8 @@ func parseHubFile(filePath string) map[string]Node {
 	return mainIndex
 }
 
-func parseProcessCommand(rawCommand string) ProcessCommand {
-	command, autoScale := extractAutoScale(rawCommand)
+func parseConfig(rawCommand string) ProcessCommand {
+	command, scaling := extractScaling(rawCommand)
 	rawSplit := strings.Split(command, " ")
 	comps := make([]string, 0)
 	for _, comp := range rawSplit {
@@ -128,17 +129,25 @@ func parseProcessCommand(rawCommand string) ProcessCommand {
 	return ProcessCommand{
 		Command:   comps[0],
 		Arguments: comps[1:],
-		AutoScale: autoScale,
+		Scaling:   scaling,
 	}
 }
 
-func extractAutoScale(cmd string) (string, bool) {
-	re := regexp.MustCompile(`\+(.+?)\+`)
+func extractScaling(cmd string) (string, uint) {
+	re := regexp.MustCompile(`\(.*[xX].*(\d+).*\)`)
 	loc := re.FindStringSubmatchIndex(cmd)
 	if loc == nil {
-		return cmd, false
+		return cmd, 1
 	}
-	return strings.TrimSpace(cmd[loc[2]:loc[3]]), true
+	times, err := strconv.ParseUint(cmd[loc[2]:loc[3]], 10, 8)
+	if err != nil {
+		log.Fatalf("Command configuration \"%s\" could not parsed: %s\n", cmd, err)
+	}
+	if times == 0 {
+		log.Fatalf("Command configuration \"%s\": Scaling to 0 not permitted!\n", cmd)
+	}
+	fixedCmd := strings.TrimSpace(cmd[:loc[0]])
+	return fixedCmd, uint(times)
 }
 
 func parseConnections(fileContent []byte) []connection {

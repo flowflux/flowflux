@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -17,7 +18,7 @@ type ProcessRunner struct {
 	findOutputRunners func(Runner) []Runner
 	channel           chan InputMessage
 	processErrorMsgs  chan<- []byte
-	load              uint64
+	PID               int
 }
 
 // Node ...
@@ -91,53 +92,47 @@ func (p ProcessRunner) Start() {
 		log.Fatal(err)
 	}
 
-	// FUTURE FEATURE CODE TO OBSERVE CPU-LOAD OF PROCESS
-	// AUTO-SCALING
-
-	var loadSample <-chan uint64
-	if p.node.Process.AutoScale {
-		loadSample = load.StartSampling(cmd.Process.Pid, 1*time.Second)
-	}
-
-	for {
-		select {
-		case message := <-p.channel:
-			if message.EOF {
-				cmdIn.Close()
-			} else {
-				_, err := cmdIn.Write(message.payload)
-				if err != nil {
-					log.Fatalf(
-						"Error writing to stdin of \"%s\": %s",
-						p.node.Process.String(),
-						err,
-					)
-				}
-			}
-		case sample := <-loadSample:
-			p.load = sample
-		}
-	}
-
-	// for message := range p.channel {
-	// 	if message.EOF {
-	// 		cmdIn.Close()
-	// 	} else {
-	// 		_, err := cmdIn.Write(message.payload)
-	// 		if err != nil {
-	// 			log.Fatalf(
-	// 				"Error writing to stdin of %s %s: %s",
-	// 				p.node.Process.Command,
-	// 				strings.Join(p.node.Process.Arguments, ", "),
-	// 				err,
-	// 			)
+	// for {
+	// 	select {
+	// 	case message := <-p.channel:
+	// 		if message.EOF {
+	// 			cmdIn.Close()
+	// 		} else {
+	// 			_, err := cmdIn.Write(message.payload)
+	// 			if err != nil {
+	// 				log.Fatalf(
+	// 					"Error writing to stdin of \"%s\": %s",
+	// 					p.node.Process.String(),
+	// 					err,
+	// 				)
+	// 			}
 	// 		}
+	// 	case sample := <-loadSample:
+	// 		p.load = sample
 	// 	}
 	// }
-}
 
-// Load ...
-func (p ProcessRunner) Load() uint64 { return p.load }
+	for message := range p.channel {
+		if message.EOF {
+			cmdIn.Close()
+		} else {
+			_, err := cmdIn.Write(message.payload)
+			if err != nil {
+				log.Fatalf(
+					"Error writing to stdin of %s %s: %s",
+					p.node.Process.Command,
+					strings.Join(p.node.Process.Arguments, ", "),
+					err,
+				)
+			}
+		}
+	}
+}
 
 // Input ...
 func (p ProcessRunner) Input() chan<- InputMessage { return p.channel }
+
+// TakeLoadSamples ...
+func (p ProcessRunner) TakeLoadSamples(every time.Duration, channel chan<- load.ProcessSample) {
+	go load.StartSamplingProcess(p.PID, every, channel)
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -15,49 +16,125 @@ import (
 
 // https://linux.die.net/man/5/proc
 
-// Classes ...
+// Process stat columns ...
 const (
-	UtimeIdx  = 13
-	StimeIdx  = 14
-	CutimeIdx = 15
-	CstimeIdx = 16
+	procUtimeIdx  = 13
+	procStimeIdx  = 14
+	procCutimeIdx = 15
+	procCstimeIdx = 16
 )
 
-// StartSampling ...
-func StartSampling(pid int, every time.Duration) <-chan uint64 {
-	channel := make(chan uint64)
-	go func() {
-		for {
-			sample, err := takeSample(pid)
-			if err != nil {
-				log.Fatalf("Error taking CPU usage sample for PID %d: %s", pid, err)
-			}
-			channel <- sample
-			time.Sleep(every) // 1 * time.Second
-		}
-	}()
-	return channel
+// CPU stat columns ...
+const (
+	cpuUserIdx   = 1
+	cpuNiceIdx   = 2
+	cpuSystemIdx = 3
+	cpuIdleIdx   = 4
+)
+
+// ProcessSample ...
+type ProcessSample struct {
+	PID  int
+	Load uint64
 }
 
-func takeSample(pid int) (uint64, error) {
+// CPUSample ...
+type CPUSample struct {
+	Load uint64
+	Idle uint64
+}
+
+var cpuCoreLineRe *regexp.Regexp
+var fullCPULineRe *regexp.Regexp
+
+func init() {
+	cpuCoreLineRe = regexp.MustCompile(`^cpu\d+`)
+	fullCPULineRe = regexp.MustCompile(`^cpu\s+`)
+}
+
+// CPUCount ...
+func CPUCount() (uint, error) {
+	contents, err := ioutil.ReadFile("/proc/stat")
+	if err != nil {
+		return 0, err
+	}
+	lines := bytes.Split(contents, []byte{'\n'})
+	var count uint
+	for _, line := range lines {
+		if cpuCoreLineRe.Match(line) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// StartSamplingCPU ...
+func StartSamplingCPU(every time.Duration, channel chan<- CPUSample) {
+	for {
+		load, idle, err := takeCPUSample()
+		if err != nil {
+			log.Fatalf("Error taking CPU load sample: %s", err)
+		}
+		channel <- CPUSample{Load: load, Idle: idle}
+		time.Sleep(every)
+	}
+}
+
+// StartSamplingProcess ...
+func StartSamplingProcess(pid int, every time.Duration, channel chan<- ProcessSample) {
+	for {
+		load, err := takeProcessSample(pid)
+		if err != nil {
+			log.Fatalf("Error taking load sample for process %d: %s", pid, err)
+		}
+		channel <- ProcessSample{PID: pid, Load: load}
+		time.Sleep(every)
+	}
+}
+
+func takeProcessSample(pid int) (uint64, error) {
 	procStatPath := fmt.Sprintf("/proc/%d/stat", pid)
 	contents, err := ioutil.ReadFile(procStatPath)
 	if err != nil {
 		return 0, err
 	}
 	fields := bytes.Fields(contents)
-	sample := parseUint64Value(UtimeIdx, fields, pid)
-	sample += parseUint64Value(StimeIdx, fields, pid)
-	sample += parseUint64Value(CutimeIdx, fields, pid)
-	sample += parseUint64Value(CstimeIdx, fields, pid)
-	return sample, nil
+	load := parseUint64Value(procUtimeIdx, fields, pid)
+	load += parseUint64Value(procStimeIdx, fields, pid)
+	load += parseUint64Value(procCutimeIdx, fields, pid)
+	load += parseUint64Value(procCstimeIdx, fields, pid)
+	return load, nil
+}
+
+func takeCPUSample() (uint64, uint64, error) {
+	contents, err := ioutil.ReadFile("/proc/stat")
+	if err != nil {
+		return 0, 0, err
+	}
+	lines := bytes.Split(contents, []byte{'\n'})
+	for _, line := range lines {
+		if fullCPULineRe.Match(line) {
+			fields := bytes.Fields(line)
+			load := parseUint64Value(cpuUserIdx, fields, -1)
+			load += parseUint64Value(cpuNiceIdx, fields, -1)
+			load += parseUint64Value(cpuSystemIdx, fields, -1)
+			idle := parseUint64Value(cpuIdleIdx, fields, -1)
+			return load, idle, nil
+		}
+	}
+	err = fmt.Errorf("Overall CPU stats not found in /proc/stat")
+	return 0, 0, err
 }
 
 func parseUint64Value(index int, fields [][]byte, pid int) uint64 {
 	field := string(fields[index])
 	val, err := strconv.ParseUint(field, 10, 64)
 	if err != nil {
-		log.Fatalf("Error parsing CPU usage sample at index %d for PID %d: %s", index, pid, err)
+		if pid == -1 {
+			log.Fatalf("Error parsing CPU load sample at index %d: %s", index, err)
+		} else {
+			log.Fatalf("Error parsing CPU usage sample at index %d for PID %d: %s", index, pid, err)
+		}
 	}
 	return val
 }

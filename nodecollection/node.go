@@ -52,7 +52,7 @@ type Node struct {
 type ProcessCommand struct {
 	Command   string
 	Arguments []string
-	AutoScale bool
+	Scaling   uint
 }
 
 func (p ProcessCommand) String() string {
