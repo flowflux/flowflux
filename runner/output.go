@@ -9,10 +9,21 @@ import (
 
 // OutputRunner ...
 type OutputRunner struct {
-	node              nodecollection.Node
-	findOutputRunners func(Runner) []Runner
-	channel           chan InputMessage
-	didCloseOutput    chan<- bool
+	node           nodecollection.Node
+	channel        chan InputMessage
+	didCloseOutput chan<- bool
+}
+
+// NewOutputRunner ...
+func NewOutputRunner(
+	node nodecollection.Node,
+	didCloseOutput chan<- bool,
+) OutputRunner {
+	return OutputRunner{
+		node:           node,
+		channel:        make(chan InputMessage, channelBufferSize),
+		didCloseOutput: didCloseOutput,
+	}
 }
 
 // Node ...

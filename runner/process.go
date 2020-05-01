@@ -14,11 +14,32 @@ import (
 
 // ProcessRunner ...
 type ProcessRunner struct {
-	node              nodecollection.Node
-	findOutputRunners func(Runner) []Runner
-	channel           chan InputMessage
-	processErrorMsgs  chan<- []byte
-	PID               int
+	node                    nodecollection.Node
+	collectDispatchChannels func(runner Runner) []chan<- InputMessage
+	channel                 chan InputMessage
+	processErrorMsgs        chan<- []byte
+	instances               []processInstance
+}
+
+// NewProcessRunner ...
+func NewProcessRunner(
+	node nodecollection.Node,
+	collectDispatchChannels func(runner Runner) []chan<- InputMessage,
+	processErrorMsgs chan<- []byte,
+) ProcessRunner {
+	instances := make([]processInstance, node.Process.Scaling)
+	var i uint
+	for i = 0; i < node.Process.Scaling; i++ {
+		instances[i] = processInstance{}
+	}
+
+	return ProcessRunner{
+		node:                    node,
+		collectDispatchChannels: collectDispatchChannels,
+		channel:                 make(chan InputMessage, channelBufferSize),
+		processErrorMsgs:        processErrorMsgs,
+		instances:               instances,
+	}
 }
 
 // Node ...
@@ -26,7 +47,55 @@ func (p ProcessRunner) Node() nodecollection.Node { return p.node }
 
 // Start ...
 func (p ProcessRunner) Start() {
-	cmd := exec.Command(p.node.Process.Command, p.node.Process.Arguments...)
+	dispatchChannels := p.collectDispatchChannels(p)
+	instanceChannels := make([]chan InputMessage, p.node.Process.Scaling)
+
+	var i uint
+	for i = 0; i < p.node.Process.Scaling; i++ {
+		instChan := make(chan InputMessage, channelBufferSize)
+		instanceChannels[i] = instChan
+		go p.instances[i].start(
+			p.node,
+			dispatchChannels,
+			instChan,
+			p.processErrorMsgs,
+		)
+	}
+
+	// Round-Robin
+	instChanIdx := 0
+	for message := range p.channel {
+		nextInstChan := instanceChannels[instChanIdx]
+		nextInstChan <- message
+		instChanIdx++
+		if instChanIdx == len(instanceChannels) {
+			instChanIdx = 0
+		}
+	}
+}
+
+// Input ...
+func (p ProcessRunner) Input() chan<- InputMessage { return p.channel }
+
+// TakeLoadSamples ...
+func (p ProcessRunner) TakeLoadSamples(every time.Duration, channel chan<- load.ProcessSample) {
+	for _, inst := range p.instances {
+		inst.takeLoadSamples(every, channel)
+	}
+}
+
+// processInstance ...
+type processInstance struct {
+	pid int
+}
+
+func (i processInstance) start(
+	node nodecollection.Node,
+	dispatchChannels []chan<- InputMessage,
+	channel chan InputMessage,
+	processErrorMsgs chan<- []byte,
+) {
+	cmd := exec.Command(node.Process.Command, node.Process.Arguments...)
 	cmdErr, err := cmd.StderrPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -46,21 +115,20 @@ func (p ProcessRunner) Start() {
 		scanner := bufio.NewScanner(cmdErr)
 		for scanner.Scan() {
 			message := scanner.Bytes()
-			p.processErrorMsgs <- message
+			processErrorMsgs <- message
 		}
 	}()
 
 	go func() {
-		dispatchChannels := collectInputChannels(p.findOutputRunners(p))
 		var scanner flowscan.Scanner
 		var scannedMessage func() []byte
 
-		if p.node.ScanMethod == nodecollection.ScanMessages {
+		if node.ScanMethod == nodecollection.ScanMessages {
 			dutyScanner := flowscan.NewHeavyDuty(cmdOut, flowscan.MsgDelimiter)
 			scannedMessage = dutyScanner.DelimitedMessage
 			scanner = dutyScanner
 
-		} else if p.node.ScanMethod == nodecollection.ScanRawBytes {
+		} else if node.ScanMethod == nodecollection.ScanRawBytes {
 			bytesScanner := flowscan.NewRawBytes(cmdOut)
 			scannedMessage = bytesScanner.Message
 			scanner = bytesScanner
@@ -91,6 +159,7 @@ func (p ProcessRunner) Start() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	i.pid = cmd.Process.Pid
 
 	// for {
 	// 	select {
@@ -112,7 +181,7 @@ func (p ProcessRunner) Start() {
 	// 	}
 	// }
 
-	for message := range p.channel {
+	for message := range channel {
 		if message.EOF {
 			cmdIn.Close()
 		} else {
@@ -120,8 +189,8 @@ func (p ProcessRunner) Start() {
 			if err != nil {
 				log.Fatalf(
 					"Error writing to stdin of %s %s: %s",
-					p.node.Process.Command,
-					strings.Join(p.node.Process.Arguments, ", "),
+					node.Process.Command,
+					strings.Join(node.Process.Arguments, ", "),
 					err,
 				)
 			}
@@ -129,10 +198,6 @@ func (p ProcessRunner) Start() {
 	}
 }
 
-// Input ...
-func (p ProcessRunner) Input() chan<- InputMessage { return p.channel }
-
-// TakeLoadSamples ...
-func (p ProcessRunner) TakeLoadSamples(every time.Duration, channel chan<- load.ProcessSample) {
-	go load.StartSamplingProcess(p.PID, every, channel)
+func (i processInstance) takeLoadSamples(every time.Duration, channel chan<- load.ProcessSample) {
+	go load.StartSamplingProcess(i.pid, every, channel)
 }

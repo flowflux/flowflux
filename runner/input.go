@@ -10,9 +10,19 @@ import (
 
 // InputRunner ...
 type InputRunner struct {
-	node              nodecollection.Node
-	findOutputRunners func(Runner) []Runner
-	channel           chan InputMessage
+	node                    nodecollection.Node
+	collectDispatchChannels func(runner Runner) []chan<- InputMessage
+}
+
+// NewInputRunner ...
+func NewInputRunner(
+	node nodecollection.Node,
+	collectDispatchChannels func(runner Runner) []chan<- InputMessage,
+) InputRunner {
+	return InputRunner{
+		node:                    node,
+		collectDispatchChannels: collectDispatchChannels,
+	}
 }
 
 // Node ...
@@ -20,7 +30,7 @@ func (i InputRunner) Node() nodecollection.Node { return i.node }
 
 // Start ...
 func (i InputRunner) Start() {
-	dispatchChannels := collectInputChannels(i.findOutputRunners(i))
+	dispatchChannels := i.collectDispatchChannels(i)
 	var scanner flowscan.Scanner
 	var scannedMessage func() []byte
 
@@ -56,4 +66,7 @@ func (i InputRunner) Start() {
 }
 
 // Input ...
-func (i InputRunner) Input() chan<- InputMessage { return i.channel }
+func (i InputRunner) Input() chan<- InputMessage {
+	log.Fatalln("Flow input cannot be used as output of other process")
+	return nil
+}
