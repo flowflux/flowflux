@@ -3,50 +3,51 @@
 Below is a diagram that shows the message flow between the actors:
 
 ```ascii
-        Client / Network
+           Client / Network
 
-            |     ^
-            V     |
+               |     ^
+               V     |
 
-         web-server.js  <---------------o
-                                        |
-               |                        |
-               |                        |
-     o---------o---------o              |
-     |                   |              |
-     V                   V              |
-                                        |
-read-file.js     find-media-type.js     |
-                                        |
-     |                   |              |
-     o---------o---------o              |
-               |                        |
-               |                        |
-               V                        |
-                                        |
-        merge-response.js  -------------o
+            web-server.js  <------------------o
+                                              |
+                  |                           |
+                  |                           |
+     o--o--o--o---o-------------o             |
+     |  |  |  |                 |             |
+     V  V  V  V                 V             |
+                                              |
+ read-file.js (x4)     find-media-type.js     |
+                                              |
+     |  |  |  |                 |             |
+     o--o--o--o---o-------------o             |
+                  |                           |
+                  |                           |
+                  V                           |
+                                              |
+          merge-response.js  -----------------o
 ```
 
-The example is a streaming web-server that serves static files. The process read-files.js sends files chunk-wise via flow messages. Web-server.js dispatches the chunks to the client.Merge-response.js takes care that chunks have the correct content-type attached, which is handled by find-media-type.js.
+The example is a streaming parallel/concurrent web-server programmed in node.js that serves static files. The process read-files.js sends files chunk-wise via flow messages. Web-server.js receives requests and dispatches the read file-chunks to the clients as they come. Merge-response.js takes care that chunks have the correct content-type attached, which is handled by find-media-type.js.
 
-Flow follows a fire-and-forget-strategy. Messages/events are running in one direction only. Both things eliminate all problems and difficulties of concurrency and parallel-programming at once.
+Flowflux follows a fire-and-forget-strategy. Messages/events are running in one direction only. Both things eliminate all problems and difficulties of concurrency and parallel-programming at once.
 
-Flow allows for 2 different ways to run this application.
+Flowflux allows for 2 different ways to run this application.
 
 1. With flow as communication hub
 2. With flow managing a collection of named UNIX pipes
 
-## Flow as communication hub
+## Flowflux as communication hub
 
 The messaging-flow between the actors is declared in a file, the file is then fed to the "flow" CLI:
 
-**Declaration file example: flow.def**
+**Definition file example: flow.def**
 
 ```ascii
-node web-server.js -> node read-file.js -> node merge-response.js
+node web-server.js -> node read-file.js (x4) -> node merge-response.js
 node web-server.js -> node find-media-type.js -> node merge-response.js
 node merge-response.js -> node web-server.js
 ```
+This flow.def describes a pipeline of communicating sequential processes, where the messaging flow is forked into 5 parallel processes, from which 4 handle file reading `node read-file.js (x4)`, and 1 handles finding the correct content type `node find-media-type.js`.
 
 ### Startup procedure
 
@@ -58,7 +59,9 @@ $ ./flow flow.def
 
 The usual `ctrl+c`.
 
-## Flow managing a collection of named UNIX pipes
+## Flowflux managing a collection of named UNIX pipes
+
+This way of running the same code does not feature parallel/concurrent execution, in order to keep the example comprehensible.
 
 ### Meaning of pipe characters:
 
