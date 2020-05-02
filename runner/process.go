@@ -109,8 +109,6 @@ func (i processInstance) start(
 		log.Fatal(err)
 	}
 
-	// cmd.Process.Pid
-
 	go func() {
 		scanner := bufio.NewScanner(cmdErr)
 		for scanner.Scan() {
@@ -124,9 +122,9 @@ func (i processInstance) start(
 		var scannedMessage func() []byte
 
 		if node.ScanMethod == nodecollection.ScanMessages {
-			dutyScanner := flowscan.NewHeavyDuty(cmdOut, flowscan.MsgDelimiter)
-			scannedMessage = dutyScanner.DelimitedMessage
-			scanner = dutyScanner
+			lenScanner := flowscan.NewLengthPrefix(cmdOut)
+			scannedMessage = lenScanner.PrefixedMessage
+			scanner = lenScanner
 
 		} else if node.ScanMethod == nodecollection.ScanRawBytes {
 			bytesScanner := flowscan.NewRawBytes(cmdOut)
