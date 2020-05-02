@@ -42,7 +42,6 @@ func (l *LengthPrefix) Scan() bool {
 		}
 		if fill > 0 {
 			l.msgCache = append(l.msgCache, l.readBuff[:fill]...)
-			// printer.LogLn(fmt.Sprintf("msgCache = %s", string(l.msgCache)))
 		}
 		if l.endIndex == 0 {
 			l.endIndex = l.parseEndIndex()

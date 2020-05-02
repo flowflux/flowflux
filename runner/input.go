@@ -35,9 +35,6 @@ func (i InputRunner) Start() {
 	var scannedMessage func() []byte
 
 	if i.node.ScanMethod == nodecollection.ScanMessages {
-		// dutyScanner := flowscan.NewHeavyDuty(os.Stdin, flowscan.MsgDelimiter)
-		// scannedMessage = dutyScanner.DelimitedMessage
-		// scanner = dutyScanner
 		lenScanner := flowscan.NewLengthPrefix(os.Stdin)
 		scannedMessage = lenScanner.PrefixedMessage
 		scanner = lenScanner
