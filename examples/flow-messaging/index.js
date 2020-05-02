@@ -1,33 +1,42 @@
 
-const DELIMITER = '\n---\n';
+const prefixSize = 20;
 
 function ParseMessage(callback) {
-  let inputCache = '';
+  let cache = '';
+  let endIndex = 0;
+  const parseEndIndex = () => {
+    if (cache.length >= prefixSize) {
+      const lengthStr = cache.slice(0, prefixSize);
+      const length = Number.parseInt(lengthStr);
+      return prefixSize + length;
+    }
+    return 0;
+  };
   return data => {
-    inputCache += data.toString();
-    let idx = inputCache.indexOf(DELIMITER);
-    while (idx > -1) {
-      const wireForm = inputCache.slice(0, idx);
-      inputCache = inputCache.slice(idx + DELIMITER.length);
-      const buff = Buffer.from(wireForm, 'base64');
-      const msg = JSON.parse(buff.toString('ascii'));
+    cache += data.toString();
+    endIndex = endIndex || parseEndIndex();
+    while (endIndex && (cache.length >= endIndex)) {
+      const msgStr = cache.slice(prefixSize, endIndex);
+      cache = cache.slice(endIndex);
+      endIndex = parseEndIndex();
+      const msg = JSON.parse(msgStr);
       callback(msg);
-      idx = inputCache.indexOf(DELIMITER);
     }
   };
 }
 
-function Envelope(msgObj) {
-  const buff = Buffer.from(JSON.stringify(msgObj));
-  return `${buff.toString('base64')}${DELIMITER}`;
+function Envelope(msg) {
+  const payload = Buffer.from(JSON.stringify(msg));
+  const prefix = `${payload.length}`.padStart(prefixSize, '0');
+  const length = Buffer.from(prefix);
+  return Buffer.concat([length, payload]);
 }
 
 function SendMessage(outputStream) {
   let sequentializer = Promise.resolve();
-
-  return message => {
+  return msg => {
     sequentializer = sequentializer.then(() => {
-      const waitForDrain = !outputStream.write(Envelope(message));
+      const waitForDrain = !outputStream.write(Envelope(msg));
       if (waitForDrain) return new Promise(resolve => {
         outputStream.once('drain', resolve);
       });
@@ -36,7 +45,6 @@ function SendMessage(outputStream) {
 }
 
 module.exports = {
-  DELIMITER,
   ParseMessage,
   Envelope,
   SendMessage,

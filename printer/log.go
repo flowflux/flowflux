@@ -4,8 +4,8 @@ import "os"
 
 // LogLn ...
 func LogLn(text string) {
-	if len(text) > 78 {
-		text = text[:78]
+	if len(text) > 512 { // 78
+		text = text[:512]
 	}
 	os.Stderr.WriteString(text + "\n")
 }

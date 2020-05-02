@@ -38,15 +38,32 @@ That means that flowflux can solve problems in the domains of concurrency and pa
 
 ## Input, Output
 
-Messages/events flow through a process/actor via `stdin` and `stdout`. Stream-connectors are expressed as named pipes or handled by Go channels (depending on which execution model is chosen). The builtin actors "fork" and "merge" are used to splice and reunite the event streams. The builtin actor "pipe" is used to rewire any `stdout` to any `stdin`.
+Messages/events flow through a process/actor via `stdin` and `stdout`. Internally the processes are connector by named pipes or handled by Go channels (depending on which execution model you chosen). The builtin actors "fork" and "merge" are used to splice and reunite the streams. The builtin actor "pipe" is used to rewire any `stdout` to any `stdin`.
 
 ### Simple Wire Format
 
-When development on this idea started, it became clear quite fast, that data transfer between different programming languages and how they handle binary data streams isn't easy to get reliable. Many different solutions where tried (length-prefixed streams, character-separated messages. etc.pp.). The following combination turned out to be a rock solid solution, though pure binary streams that are not segmented automatically at message-boundaries are supported too.
+Flowflux suggests messages/events to be JSON encoded, because it's pervasively supported and fast. To distinguish messages from another, each string is required to be prefixed with it's length, like so:
 
-Messages/events themselves are JSON encoded, because it's pervasively supported. To distinguish messages from another, an additional envelope layer is used: The message is base64-encoded and suffixed with the delimiter `\n---\n`. This seems unnecessary at first, but a pure JSON wire-format would require 100% control over how the JSON is generated and how it's data is escaped. An additional base64 envelope is an equally pervasive solution that gives communication robustness. The delimiter `\n---\n` is nicely recognizable in between any form of generated base64.
+```json
+00000000000000078377{"id":"ck9pwb050001u26i021e96bed","cmd":"PROCESS_FILE_CHUNK","encoding":"base64","payload":"WQtbibrqaWDYlz...
+```
 
-As mentioned before, raw byte streams are supported too if flow is used as a communication hub with a `flow.def` file. A connection specified with `*->` instead of `->` stands for a raw binary stream.
+#### Length-Prefixes
+
+Length-prefixes are required to be unsigned 64bit integers rendered as UTF8-strings. Each needs to be exactly 20 digits long and 0-padded to the left. See [examples/flow-messaging](examples/flow-messaging/index.js) for an example of a NodeJS-implementation of this wire-format.
+
+```js
+function Envelope(msg) {
+  const payload = Buffer.from(JSON.stringify(msg));
+  const prefix = `${payload.length}`.padStart(20, '0');
+  const length = Buffer.from(prefix);
+  return Buffer.concat([length, payload]);
+}
+```
+
+For an example of how to parse this messages, have a look at `ParseMessage` in [examples/flow-messaging](examples/flow-messaging/index.js).
+
+Raw byte streams are supported too if flow is used as a communication hub with a `flow.def` file. A connection specified with `*->` instead of `->` defines a raw binary stream.
 
 ## Example:
 
@@ -77,7 +94,7 @@ Given the following flow-graph...
           merge-response.js  -----------------o
 ```
 
-The communications can be described in a flow.def files as follows:
+The communications can be described in a flow.def file as follows:
 
 ```ascii
 node web-server.js -> node read-file.js (x4) -> node merge-response.js

@@ -1,2 +1,0 @@
-- [ ] Make logging functionality in fork.go, merge.go and pipe.go optional by argument and/or ENV
-- [ ] 
