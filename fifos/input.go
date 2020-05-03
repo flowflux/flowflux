@@ -2,8 +2,6 @@ package fifos
 
 import (
 	"bufio"
-	"encoding/base64"
-	"flowflux/flowscan"
 	"fmt"
 	"io"
 	"log"
@@ -31,18 +29,18 @@ func runInput(usrWrFile io.Reader, usrRdFile io.Writer) error {
 
 	for {
 		fmt.Print("JSON -> ")
-		text, err := reader.ReadString('\n')
+		msgStr, err := reader.ReadString('\n')
 		if err != nil {
 			return err
 		}
-		text = strings.Replace(text, "\n", "", -1)
+		msgStr = strings.Replace(msgStr, "\n", "", -1)
 
-		msg := []byte(text)
-		msgB64 := make([]byte, base64.StdEncoding.EncodedLen(len(msg)))
+		msgBytes := []byte(msgStr)
+		msgLen := len(msgBytes)
+		msgLenStr := fmt.Sprintf("%020d", msgLen)
+		envelope := append([]byte(msgLenStr), msgBytes...)
 
-		base64.StdEncoding.Encode(msgB64, msg)
-		msgB64 = append(msgB64, flowscan.MsgDelimiter...)
-		_, err = usrRdFile.Write(msgB64)
+		_, err = usrRdFile.Write(envelope)
 		if err != nil {
 			return err
 		}

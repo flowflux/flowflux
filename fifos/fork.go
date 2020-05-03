@@ -45,18 +45,14 @@ func StartFork(usrWrName string, usrRdNames []string) {
 }
 
 func runFork(usrWrFile io.Reader, usrRdFiles []io.Writer) error {
-	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
-	scanner.Decode = flowscan.DecodeBase64Message
+	scanner := flowscan.NewLengthPrefix(usrWrFile)
 
 	for scanner.Scan() {
-		msg, err := scanner.DecodedMessage()
-		if err != nil {
-			return err
-		}
+		msg := scanner.Message()
 		printer.LogLn(fmt.Sprintf("FORKING: %s", msg))
 
 		for _, usrRdFile := range usrRdFiles {
-			_, err = usrRdFile.Write(scanner.DelimitedMessage())
+			_, err := usrRdFile.Write(scanner.PrefixedMessage())
 			if err != nil {
 				return err
 			}

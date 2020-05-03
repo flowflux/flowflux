@@ -31,18 +31,14 @@ func StartPipe(name string) {
 }
 
 func runPipe(usrWrFile io.Reader, usrRdFile io.Writer) error {
-	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
-	scanner.Decode = flowscan.DecodeBase64Message
+	scanner := flowscan.NewLengthPrefix(usrWrFile)
 
 	for scanner.Scan() {
-		msg, err := scanner.DecodedMessage()
-		if err != nil {
-			return err
-		}
+		msg := scanner.Message()
 
 		printer.LogLn(fmt.Sprintf("PIPING: %s", msg))
 
-		_, err = usrRdFile.Write(scanner.DelimitedMessage())
+		_, err := usrRdFile.Write(scanner.PrefixedMessage())
 		if err != nil {
 			return err
 		}

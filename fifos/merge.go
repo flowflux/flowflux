@@ -82,18 +82,14 @@ func scanReader(
 	errors chan<- error,
 	quit chan<- error,
 ) {
-	scanner := flowscan.NewHeavyDuty(usrWrFile, flowscan.MsgDelimiter)
-	scanner.Decode = flowscan.DecodeBase64Message
+	scanner := flowscan.NewLengthPrefix(usrWrFile)
 
 	for scanner.Scan() {
-		msg, err := scanner.DecodedMessage()
-		if err != nil {
-			errors <- err
-		}
+		msg := scanner.Message() // TODO: Test if copying is required
 		logMsg := fmt.Sprintf("MERGING: %s", msg)
 		logging <- logMsg
 
-		merger <- scanner.DelimitedMessage()
+		merger <- scanner.PrefixedMessage()
 	}
 
 	errors <- scanner.Err()
